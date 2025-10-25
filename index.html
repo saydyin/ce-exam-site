@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Civil Engineering Exam Simulator</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- PDF Generation Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
-    <!-- Loading Screen -->
     <div id="screen-loading" class="screen">
         <div class="loading-container">
             <div class="spinner"></div>
@@ -15,7 +17,6 @@
         </div>
     </div>
 
-    <!-- Main Menu -->
     <div id="screen-main-menu" class="screen hidden">
         <div class="container">
             <div class="header">
@@ -32,6 +33,7 @@
                     <button id="btn-settings" class="btn btn-secondary">⚙️ Settings</button>
                     <button id="btn-bookmarks" class="btn btn-secondary">🔖 Bookmarks</button>
                     <button id="btn-analytics" class="btn btn-secondary">📊 Analytics</button>
+                    <button id="btn-download-pdf" class="btn btn-secondary">📄 Download for Offline</button>
                 </div>
                 
                 <button id="btn-reset" class="btn btn-danger">🗑️ Reset Exam Data</button>
@@ -39,7 +41,6 @@
         </div>
     </div>
 
-    <!-- Instructions Screen -->
     <div id="screen-instructions" class="screen hidden">
         <div class="container">
             <div class="card">
@@ -61,7 +62,6 @@
         </div>
     </div>
 
-    <!-- Exam Screen -->
     <div id="screen-exam" class="screen hidden">
         <header class="exam-header">
             <div class="container">
@@ -94,7 +94,6 @@
         </main>
     </div>
 
-    <!-- Modals -->
     <div id="image-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <button id="close-image-modal" class="modal-close">
