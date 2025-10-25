@@ -26,14 +26,14 @@
       <div id="section-grid" class="section-grid"></div>
 
       <div class="action-buttons">
-        <button id="btn-full-mock" class="btn btn-primary">🚀 Start Full Mock Exam</button>
+        <button type="button" id="btn-full-mock" class="btn btn-primary">🚀 Start Full Mock Exam</button>
         <div class="nav-buttons">
-          <button id="btn-settings" class="btn btn-secondary">⚙️ Settings</button>
-          <button id="btn-bookmarks" class="btn btn-secondary">🔖 Bookmarks</button>
-          <button id="btn-analytics" class="btn btn-secondary">📊 Analytics</button>
-          <button id="btn-download-pdf" class="btn btn-secondary">📄 Download for Offline</button>
+          <button type="button" id="btn-settings" class="btn btn-secondary">⚙️ Settings</button>
+          <button type="button" id="btn-bookmarks" class="btn btn-secondary">🔖 Bookmarks</button>
+          <button type="button" id="btn-analytics" class="btn btn-secondary">📊 Analytics</button>
+          <button type="button" id="btn-download-pdf" class="btn btn-secondary">📄 Download for Offline</button>
         </div>
-        <button id="btn-reset" class="btn btn-danger">🗑️ Reset Exam Data</button>
+        <button type="button" id="btn-reset" class="btn btn-danger">🗑️ Reset Exam Data</button>
       </div>
     </div>
   </div>
@@ -52,8 +52,8 @@
         <div id="motivational-quote" class="quote"></div>
 
         <div class="action-buttons">
-          <button id="btn-instructions-back" class="btn btn-secondary">Back to Main Menu</button>
-          <button id="btn-start-exam" class="btn btn-primary">Start Exam Section</button>
+          <button type="button" id="btn-instructions-back" class="btn btn-secondary">Back to Main Menu</button>
+          <button type="button" id="btn-start-exam" class="btn btn-primary">Start Exam Section</button>
         </div>
       </div>
     </div>
@@ -68,17 +68,17 @@
         </div>
         <div class="exam-controls">
           <div id="exam-timer" class="timer">05:00:00</div>
-          <button id="btn-pause-resume" class="btn btn-secondary">
+          <button type="button" id="btn-pause-resume" class="btn btn-secondary" aria-label="Pause or resume exam">
             <svg class="icon" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6"></path>
             </svg>
-            Pause
+            <span class="sr-only">Pause or Resume</span>
           </button>
-          <button id="btn-submit-exam" class="btn btn-primary">
+          <button type="button" id="btn-submit-exam" class="btn btn-primary" aria-label="Submit exam">
             <svg class="icon" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
             </svg>
-            Submit
+            <span class="sr-only">Submit Exam</span>
           </button>
         </div>
       </div>
@@ -93,7 +93,7 @@
 
   <div id="image-modal" class="modal-overlay hidden">
     <div class="modal-content">
-      <button id="close-image-modal" class="modal-close">
+      <button type="button" id="close-image-modal" class="modal-close" aria-label="Close image modal">
         <svg class="icon" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
         </svg>
@@ -107,8 +107,8 @@
       <h2 id="confirm-title"></h2>
       <p id="confirm-message"></p>
       <div class="modal-buttons">
-        <button id="btn-confirm-cancel" class="btn btn-secondary">Cancel</button>
-        <button id="btn-confirm-ok" class="btn btn-primary">OK</button>
+        <button type="button" id="btn-confirm-cancel" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="btn-confirm-ok" class="btn btn-primary">OK</button>
       </div>
     </div>
   </div>
