@@ -101,7 +101,6 @@ function getQuestionsForSection(sectionName) {
 }
 
 function processQuestionsWithGroups(questions) {
-    // Step 1: Group by group_id
     const groupMap = {};
     questions.forEach(question => {
         const gid = question.group_id;
@@ -114,10 +113,8 @@ function processQuestionsWithGroups(questions) {
         }
     });
 
-    // Step 2: Separate valid Situation groups (exactly 3) from others
     const validGroups = [];
     const standaloneQuestions = [];
-
     Object.entries(groupMap).forEach(([gid, group]) => {
         if (group.length === 3 && gid !== '__single_undefined' && !gid.startsWith('__single_')) {
             const hasSituationStem = group.some(q => q.stem.trim().startsWith('Situation'));
@@ -135,14 +132,11 @@ function processQuestionsWithGroups(questions) {
         }
     });
 
-    // Step 3: Shuffle both lists independently
     const shuffledGroups = shuffleArray(validGroups);
     const shuffledSingles = shuffleArray(standaloneQuestions);
 
-    // Step 4: Interleave singles between groups
     let result = [];
     let singleIndex = 0;
-
     if (shuffledGroups.length > 0) {
         shuffledGroups.forEach((group, i) => {
             result.push(...group);
@@ -158,11 +152,9 @@ function processQuestionsWithGroups(questions) {
         result = shuffledSingles;
     }
 
-    // Step 5: Ensure no Situation group is in last 5 questions
     const checkLastN = 5;
     const tail = result.slice(-checkLastN);
     const badIndex = tail.findIndex(q => q.stem.trim().startsWith('Situation'));
-    
     if (badIndex !== -1) {
         const badQ = result[result.length - checkLastN + badIndex];
         const badGroupId = badQ.group_id;
@@ -175,7 +167,6 @@ function processQuestionsWithGroups(questions) {
         }
     }
 
-    // Step 6: Sanitize group_id for non-Situation or incomplete groups
     const groupSizeMap = {};
     result.forEach(q => {
         const gid = q.group_id;
@@ -183,7 +174,6 @@ function processQuestionsWithGroups(questions) {
             groupSizeMap[gid] = (groupSizeMap[gid] || 0) + 1;
         }
     });
-
     result.forEach(q => {
         const gid = q.group_id;
         const groupSize = groupSizeMap[gid];
@@ -192,10 +182,8 @@ function processQuestionsWithGroups(questions) {
             q.group_id = null;
         }
     });
-
     return result;
 }
-
 
 function shuffleArray(array) {
     const newArray = [...array];
@@ -243,7 +231,7 @@ function showScreen(screenId) {
 }
 
 // ======================
-// BOOKMARKS - FIXED
+// BOOKMARKS
 // ======================
 function toggleBookmark(section, questionIndex) {
     const bookmarkId = `${section}-${questionIndex}`;
@@ -259,11 +247,11 @@ function toggleBookmark(section, questionIndex) {
         });
     }
     saveState();
-    return existingIndex === -1; // true = just bookmarked
+    return existingIndex === -1;
 }
 
 // ======================
-// TIMER & QUESTION LOADING - FIXED
+// TIMER & QUESTION LOADING
 // ======================
 function loadQuestionsForSection(sectionName) {
     const savedKey = `examQuestions_${sectionName}`;
@@ -279,7 +267,6 @@ function loadQuestionsForSection(sectionName) {
     if (!appState.answers[sectionName]) {
         appState.answers[sectionName] = new Array(sectionQuestions.length).fill(null);
     }
-    // ✅ Always reset timer to full section time
     appState.timeLeft = SECTIONS[sectionName].time;
     if (document.getElementById('exam-timer')) {
         document.getElementById('exam-timer').textContent = formatTime(appState.timeLeft);
@@ -302,7 +289,7 @@ function startTimer() {
 }
 
 // ======================
-// RESET - Now also clears saved questions
+// RESET
 // ======================
 function resetExam() {
     if (!confirm('Are you sure you want to reset all exam data? This cannot be undone.')) return;
@@ -315,7 +302,6 @@ function resetExam() {
     localStorage.removeItem('examAnswers');
     localStorage.removeItem('examResults');
     localStorage.removeItem('examBookmarks');
-    // ✅ Clear saved questions so new exam = fresh shuffle
     Object.keys(SECTIONS).forEach(sectionName => {
         localStorage.removeItem(`examQuestions_${sectionName}`);
     });
@@ -404,7 +390,7 @@ function renderInstructions() {
 }
 
 // ======================
-// EXAM SCREEN - FIXED BOOKMARK UI
+// EXAM SCREEN
 // ======================
 function renderExam() {
     const section = SECTIONS[appState.currentSection];
@@ -455,7 +441,6 @@ function renderExam() {
         container.appendChild(questionCard);
     });
 
-    // ✅ Fixed bookmark event listener
     document.querySelectorAll('[data-bookmark]').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const button = e.currentTarget;
@@ -466,35 +451,32 @@ function renderExam() {
         });
     });
 
-document.querySelectorAll('.choice-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        const btnEl = e.target.closest('.choice-btn');
-        const questionIndex = parseInt(btnEl.dataset.question);
-        const choice = btnEl.dataset.choice;
-        selectAnswer(questionIndex, choice);
-
-        const questionCard = document.getElementById(`question-${questionIndex}`);
-        questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => {
-            choiceBtn.classList.remove('selected');
-        });
-        btnEl.classList.add('selected');
-
-        // Auto-scroll to next question
-        const nextIndex = questionIndex + 1;
-        const nextEl = document.getElementById(`question-${nextIndex}`);
-        if (nextEl) {
-            const header = document.querySelector('.exam-header');
-            const headerHeight = header ? header.offsetHeight : 60;
-            const elementPosition = nextEl.getBoundingClientRect().top + window.scrollY;
-            const offsetPosition = elementPosition - headerHeight - 10;
-            window.scrollTo({
-                top: offsetPosition,
-                behavior: 'smooth'
+    document.querySelectorAll('.choice-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const btnEl = e.target.closest('.choice-btn');
+            const questionIndex = parseInt(btnEl.dataset.question);
+            const choice = btnEl.dataset.choice;
+            selectAnswer(questionIndex, choice);
+            const questionCard = document.getElementById(`question-${questionIndex}`);
+            questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => {
+                choiceBtn.classList.remove('selected');
             });
-        }
-    });
-});
+            btnEl.classList.add('selected');
 
+            const nextIndex = questionIndex + 1;
+            const nextEl = document.getElementById(`question-${nextIndex}`);
+            if (nextEl) {
+                const header = document.querySelector('.exam-header');
+                const headerHeight = header ? header.offsetHeight : 60;
+                const elementPosition = nextEl.getBoundingClientRect().top + window.scrollY;
+                const offsetPosition = elementPosition - headerHeight - 10;
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
 
     document.querySelectorAll('img[data-figure]').forEach(img => {
         img.addEventListener('click', () => {
@@ -507,7 +489,6 @@ document.querySelectorAll('.choice-btn').forEach(btn => {
         clearInterval(appState.timerInterval);
         showScreen('main-menu');
     };
-
     document.getElementById('btn-submit-exam').onclick = () => {
         showConfirmModal(
             "Confirm Submission",
@@ -564,34 +545,74 @@ function showConfirmModal(title, message, onConfirm) {
     document.getElementById('confirm-title').textContent = title;
     document.getElementById('confirm-message').textContent = message;
     document.getElementById('confirm-modal').classList.remove('hidden');
-
     const cancelBtn = document.getElementById('btn-confirm-cancel');
     const okBtn = document.getElementById('btn-confirm-ok');
-
     const handleCancel = () => {
         document.getElementById('confirm-modal').classList.add('hidden');
         cancelBtn.removeEventListener('click', handleCancel);
         okBtn.removeEventListener('click', handleConfirm);
     };
-
     const handleConfirm = () => {
         onConfirm();
         handleCancel();
     };
-
     cancelBtn.addEventListener('click', handleCancel);
     okBtn.addEventListener('click', handleConfirm);
 }
 
 // ======================
-// RESULTS SCREEN
+// RESULTS SCREEN – FIXED (uses pre-existing container)
 // ======================
 function showResultsScreen(sectionName) {
     const result = appState.results[sectionName];
     const passed = result.score_pct >= 70;
-    const screen = document.createElement('div');
-    screen.id = 'screen-results';
-    screen.className = 'screen';
+    const screen = document.getElementById('screen-results');
+
+    let wrongAnswersHTML = '';
+    if (result.wrong.length > 0) {
+        result.wrong.forEach(wrong => {
+            let choicesHtml = '';
+            wrong.choices.forEach((choice, index) => {
+                const letter = String.fromCharCode(65 + index);
+                const isCorrect = letter === wrong.correct_answer;
+                const isUser = letter === wrong.user_answer;
+                let choiceClass = 'choice-btn';
+                if (isCorrect) choiceClass += ' bg-green-100 border-green-500';
+                else if (isUser) choiceClass += ' bg-red-100 border-red-500';
+                choicesHtml += `
+                    <div class="${choiceClass}">
+                        <span class="choice-letter">${letter}.</span>
+                        <span>${choice}</span>
+                    </div>
+                `;
+            });
+            wrongAnswersHTML += `
+                <div class="wrong-answer-card">
+                    <div class="question-header">
+                        <p class="question-number">Question ${wrong.number}</p>
+                    </div>
+                    <p class="question-stem whitespace-pre-wrap">${wrong.stem}</p>
+                    ${wrong.figure ? `
+                        <div class="question-image">
+                            <img src="${wrong.figure}" alt="Figure for question ${wrong.number}" data-figure="${wrong.figure}">
+                        </div>
+                    ` : ''}
+                    <div class="choices-container">${choicesHtml}</div>
+                    <div class="answer-comparison">
+                        <p class="user-answer">Your Answer: ${wrong.user_answer || "Not Answered"}</p>
+                        <p class="correct-answer">Correct Answer: ${wrong.correct_answer}</p>
+                        ${wrong.explanation ? `
+                            <div class="explanation">
+                                <p class="explanation-title">Explanation:</p>
+                                <p>${wrong.explanation}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        });
+    }
+
     screen.innerHTML = `
         <div class="container">
             <div class="results-header">
@@ -609,93 +630,38 @@ function showResultsScreen(sectionName) {
             ${result.wrong.length > 0 ? `
                 <div class="wrong-answers-section">
                     <h2 class="wrong-answers-title">Incorrect Answers Review</h2>
-                    <div id="wrong-answers-list"></div>
+                    <div id="wrong-answers-list">${wrongAnswersHTML}</div>
                 </div>
             ` : ''}
             <button id="btn-back-to-main" class="btn btn-secondary">Back to Main Menu</button>
         </div>
     `;
-    document.body.appendChild(screen);
+
     showScreen('results');
 
-    if (result.wrong.length > 0) {
-        const list = document.getElementById('wrong-answers-list');
-        result.wrong.forEach(wrong => {
-            const card = document.createElement('div');
-            card.className = 'wrong-answer-card';
-            let choicesHtml = '';
-            wrong.choices.forEach((choice, index) => {
-                const letter = String.fromCharCode(65 + index);
-                const isCorrect = letter === wrong.correct_answer;
-                const isUser = letter === wrong.user_answer;
-                let choiceClass = 'choice-btn';
-                if (isCorrect) choiceClass += ' bg-green-100 border-green-500';
-                else if (isUser) choiceClass += ' bg-red-100 border-red-500';
-                choicesHtml += `
-                    <div class="${choiceClass}">
-                        <span class="choice-letter">${letter}.</span>
-                        <span>${choice}</span>
-                    </div>
-                `;
-            });
-            card.innerHTML = `
-                <div class="question-header">
-                    <p class="question-number">Question ${wrong.number}</p>
-                </div>
-                <p class="question-stem whitespace-pre-wrap">${wrong.stem}</p>
-                ${wrong.figure ? `
-                    <div class="question-image">
-                        <img src="${wrong.figure}" alt="Figure for question ${wrong.number}" data-figure="${wrong.figure}">
-                    </div>
-                ` : ''}
-                <div class="choices-container">${choicesHtml}</div>
-                <div class="answer-comparison">
-                    <p class="user-answer">Your Answer: ${wrong.user_answer || "Not Answered"}</p>
-                    <p class="correct-answer">Correct Answer: ${wrong.correct_answer}</p>
-                    ${wrong.explanation ? `
-                        <div class="explanation">
-                            <p class="explanation-title">Explanation:</p>
-                            <p>${wrong.explanation}</p>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-            list.appendChild(card);
+    document.querySelectorAll('#wrong-answers-list img[data-figure]').forEach(img => {
+        img.addEventListener('click', () => {
+            document.getElementById('zoomed-image').src = img.src;
+            document.getElementById('image-modal').classList.remove('hidden');
         });
-        list.querySelectorAll('img[data-figure]').forEach(img => {
-            img.addEventListener('click', () => {
-                document.getElementById('zoomed-image').src = img.src;
-                document.getElementById('image-modal').classList.remove('hidden');
-            });
-        });
-    }
+    });
 
-    document.getElementById('btn-review-all').onclick = () => {
-        screen.remove();
-        showReviewScreen(sectionName);
-    };
-    document.getElementById('btn-continue').onclick = () => {
-        screen.remove();
-        showScreen('main-menu');
-    };
-    document.getElementById('btn-back-to-main').onclick = () => {
-        screen.remove();
-        showScreen('main-menu');
-    };
+    document.getElementById('btn-review-all').onclick = () => showReviewScreen(sectionName);
+    document.getElementById('btn-continue').onclick = () => showScreen('main-menu');
+    document.getElementById('btn-back-to-main').onclick = () => showScreen('main-menu');
 }
 
 // ======================
-// REVIEW SCREEN
+// REVIEW SCREEN – FIXED
 // ======================
 function showReviewScreen(sectionName) {
     const savedKey = `examQuestions_${sectionName}`;
     const savedQuestions = localStorage.getItem(savedKey);
     let questions = savedQuestions ? JSON.parse(savedQuestions) : getQuestionsForSection(sectionName);
     const answers = appState.answers[sectionName] || [];
-    const screen = document.createElement('div');
-    screen.id = 'screen-review';
-    screen.className = 'screen';
-    screen.innerHTML = `
+
+    const screen = document.getElementById('screen-review');
+    let content = `
         <div class="container">
             <div class="card">
                 <div class="question-header">
@@ -709,14 +675,13 @@ function showReviewScreen(sectionName) {
             </div>
         </div>
     `;
-    document.body.appendChild(screen);
+    screen.innerHTML = content;
     showScreen('review');
+
     const list = document.getElementById('review-questions-list');
     questions.forEach((question, index) => {
         const userAnswer = answers[index];
         const isCorrect = userAnswer === question.correct_answer;
-        const card = document.createElement('div');
-        card.className = 'question-card';
         let choicesHtml = '';
         question.choices.forEach((choice, choiceIndex) => {
             const letter = String.fromCharCode(65 + choiceIndex);
@@ -732,6 +697,8 @@ function showReviewScreen(sectionName) {
                 </div>
             `;
         });
+        const card = document.createElement('div');
+        card.className = 'question-card';
         card.innerHTML = `
             <div class="question-header">
                 <p class="question-number">Question ${index + 1}</p>
@@ -757,83 +724,59 @@ function showReviewScreen(sectionName) {
         `;
         list.appendChild(card);
     });
+
     list.querySelectorAll('img[data-figure]').forEach(img => {
         img.addEventListener('click', () => {
             document.getElementById('zoomed-image').src = img.src;
             document.getElementById('image-modal').classList.remove('hidden');
         });
     });
+
     document.getElementById('btn-review-back').onclick = () => {
-        screen.remove();
         showScreen('main-menu');
     };
 }
 
 // ======================
-// OTHER SCREENS
+// SETTINGS SCREEN – FIXED
 // ======================
 function showSettingsScreen() {
-    const screen = document.createElement('div');
-    screen.id = 'screen-settings';
-    screen.className = 'screen';
-    screen.innerHTML = `
-        <div class="container">
-            <div class="card">
-                <h1 class="section-title">Settings</h1>
-                <div class="settings-options">
-                    <div class="setting-item">
-                        <label>Theme</label>
-                        <select id="setting-theme">
-                            <option value="light">Light</option>
-                            <option value="dark">Dark</option>
-                        </select>
-                    </div>
-                    <div class="setting-item">
-                        <label>Font Size</label>
-                        <select id="setting-font">
-                            <option value="small">Small</option>
-                            <option value="medium">Medium</option>
-                            <option value="large">Large</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="action-buttons">
-                    <button id="btn-settings-back" class="btn btn-secondary">Back to Main Menu</button>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(screen);
     showScreen('settings');
     document.getElementById('setting-theme').value = appState.settings.theme;
     document.getElementById('setting-font').value = appState.settings.fontSize;
-    document.getElementById('setting-theme').onchange = (e) => {
+
+    const handleThemeChange = (e) => {
         appState.settings.theme = e.target.value;
         document.documentElement.classList.toggle('dark', appState.settings.theme === 'dark');
         saveState();
     };
-    document.getElementById('setting-font').onchange = (e) => {
+    const handleFontChange = (e) => {
         appState.settings.fontSize = e.target.value;
         saveState();
     };
+
+    const themeSelect = document.getElementById('setting-theme');
+    const fontSelect = document.getElementById('setting-font');
+    themeSelect.onchange = handleThemeChange;
+    fontSelect.onchange = handleFontChange;
+
     document.getElementById('btn-settings-back').onclick = () => {
-        screen.remove();
         showScreen('main-menu');
     };
 }
 
+// ======================
+// BOOKMARKS SCREEN – FIXED
+// ======================
 function showBookmarksScreen() {
-    const screen = document.createElement('div');
-    screen.id = 'screen-bookmarks';
-    screen.className = 'screen';
-    let content = `
-        <div class="container">
-            <h1 class="section-title">📖 Bookmarked Questions</h1>
-    `;
+    const bookmarksContainer = document.getElementById('bookmarks-content');
+    const clearBtn = document.getElementById('btn-clear-bookmarks');
+
     if (appState.bookmarks.length === 0) {
-        content += `<div class="card text-center"><p>No bookmarks yet.</p></div>`;
+        bookmarksContainer.innerHTML = `<p class="text-center">No bookmarks yet.</p>`;
+        clearBtn.classList.add('hidden');
     } else {
-        content += '<div class="bookmarks-list">';
+        let content = '<div class="bookmarks-list">';
         appState.bookmarks.forEach(bookmark => {
             content += `
                 <div class="card bookmark-item">
@@ -845,52 +788,52 @@ function showBookmarksScreen() {
             `;
         });
         content += '</div>';
-    }
-    content += `
-            <div class="action-buttons">
-                ${appState.bookmarks.length > 0 ? '<button id="btn-clear-bookmarks" class="btn btn-danger">Clear All</button>' : ''}
-                <button id="btn-bookmarks-back" class="btn btn-secondary">Back to Main Menu</button>
-            </div>
-        </div>
-    `;
-    screen.innerHTML = content;
-    document.body.appendChild(screen);
-    showScreen('bookmarks');
-    document.querySelectorAll('[data-go]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const [section, index] = e.target.dataset.go.split('-');
-            appState.currentSection = section;
-            loadQuestionsForSection(section);
-            showScreen('exam');
-            setTimeout(() => {
-                const el = document.getElementById(`question-${index}`);
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
+        bookmarksContainer.innerHTML = content;
+        clearBtn.classList.remove('hidden');
+
+        document.querySelectorAll('[data-go]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const [section, index] = e.target.dataset.go.split('-');
+                appState.currentSection = section;
+                loadQuestionsForSection(section);
+                showScreen('exam');
+                setTimeout(() => {
+                    const el = document.getElementById(`question-${index}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+            });
         });
-    });
-    if (appState.bookmarks.length > 0) {
-        document.getElementById('btn-clear-bookmarks').onclick = () => {
-            appState.bookmarks = [];
-            saveState();
-            screen.remove();
-            showBookmarksScreen();
+
+        clearBtn.onclick = () => {
+            if (confirm('Clear all bookmarks?')) {
+                appState.bookmarks = [];
+                saveState();
+                showBookmarksScreen();
+            }
         };
     }
+
+    showScreen('bookmarks');
     document.getElementById('btn-bookmarks-back').onclick = () => {
-        screen.remove();
         showScreen('main-menu');
     };
 }
 
+// ======================
+// ANALYTICS SCREEN – FIXED
+// ======================
 function showAnalyticsScreen() {
-    const screen = document.createElement('div');
-    screen.id = 'screen-analytics';
-    screen.className = 'screen';
-    let content = `<div class="container"><h1 class="section-title">Performance Analytics</h1>`;
+    const analyticsContent = document.getElementById('analytics-content');
+
     if (Object.keys(appState.results).length === 0) {
-        content += `<div class="card text-center"><h2>No Analytics Available</h2><p>Complete at least one exam section...</p></div>`;
+        analyticsContent.innerHTML = `
+            <div class="card text-center">
+                <h2>No Analytics Available</h2>
+                <p>Complete at least one exam section...</p>
+            </div>
+        `;
     } else {
-        content += '<div class="analytics-grid">';
+        let content = '<div class="analytics-grid">';
         Object.keys(appState.results).forEach(sectionName => {
             const result = appState.results[sectionName];
             const section = SECTIONS[sectionName];
@@ -913,73 +856,64 @@ function showAnalyticsScreen() {
             `;
         });
         content += '</div>';
-    }
-    content += `<div class="action-buttons"><button id="btn-analytics-back" class="btn btn-secondary">Back to Main Menu</button></div></div>`;
-    screen.innerHTML = content;
-    document.body.appendChild(screen);
-    showScreen('analytics');
-    document.querySelectorAll('[data-review]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const sectionName = e.target.dataset.review;
-            screen.remove();
-            showReviewScreen(sectionName);
+        analyticsContent.innerHTML = content;
+
+        document.querySelectorAll('[data-review]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const sectionName = e.target.dataset.review;
+                showReviewScreen(sectionName);
+            });
         });
-    });
+    }
+
+    showScreen('analytics');
     document.getElementById('btn-analytics-back').onclick = () => {
-        screen.remove();
         showScreen('main-menu');
     };
 }
 
 // ======================
-// PDF GENERATION (Legal size, Courier, grouped figures)
+// PDF GENERATION
 // ======================
-
 async function generateOfflinePDF() {
-    if (!confirm('Generate optimized Legal-size PDF with answer sheet, questions, and figures?')) return;
-
+    if (!confirm('Generate optimized Legal-size PDF with answer sheet and grouped figures?')) return;
     const { jsPDF } = window.jspdf;
-    const PAGE_WIDTH = 612;   // 8.5" * 72
-    const PAGE_HEIGHT = 936;  // 13" * 72
-    const MARGIN = 18;        // 0.25"
-    const COL_WIDTH = (PAGE_WIDTH - 3 * MARGIN) / 2;
-
     const doc = new jsPDF({
         orientation: 'p',
         unit: 'pt',
-        format: [PAGE_WIDTH, PAGE_HEIGHT]
+        format: [612, 936] // Legal: 8.5" x 13"
     });
-
     doc.setFont('courier', 'normal');
     doc.setFontSize(12);
 
-    // === PAGE 1: Answer Sheet ===
+    // Page 1: Answer Sheet
     try {
         const img = new Image();
         img.src = 'Practice Answer Sheet.jpg';
         await img.decode();
-        doc.addImage(img, 'JPEG', MARGIN, MARGIN, PAGE_WIDTH - 2 * MARGIN, PAGE_HEIGHT - 2 * MARGIN);
+        doc.addImage(img, 'JPEG', 40, 40, 532, 856);
     } catch {
-        doc.text('ANSWER SHEET (image missing)', MARGIN, MARGIN);
+        doc.text('ANSWER SHEET (image missing)', 72, 72);
     }
     doc.addPage();
 
-    // === Sanitize text ===
-    function cleanText(text) {
-        return (text || '')
-            .replace(/À/g, 'π')
-            .replace(/(\d)\s+(\d{3})/g, '$1$2')
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
+    const figureGroups = {};
+    const noFigure = [];
+    const allQuestions = appState.fullQuestionBank.length ? appState.fullQuestionBank : getFallbackQuestions();
+    allQuestions.forEach(q => {
+        if (q.figure) {
+            if (!figureGroups[q.figure]) figureGroups[q.figure] = [];
+            figureGroups[q.figure].push(q);
+        } else {
+            noFigure.push(q);
+        }
+    });
 
-    // === Draw choices ===
     function drawChoices(choices, x, y, maxWidth) {
         const labels = ['A.', 'B.', 'C.', 'D.'];
-        const texts = labels.map((l, i) => choices[i] ? `${l} ${cleanText(choices[i])}` : '');
+        const texts = labels.map((l, i) => `${l} ${choices[i]}`);
         const widths = texts.map(t => doc.getTextWidth(t));
         const maxChoiceWidth = Math.max(...widths);
-
         if (maxChoiceWidth * 2 + 20 <= maxWidth) {
             doc.text(texts[0], x, y);
             doc.text(texts[2], x + maxWidth / 2, y);
@@ -988,94 +922,190 @@ async function generateOfflinePDF() {
             return y + 36;
         } else {
             texts.forEach((t, i) => {
-                if (t) doc.text(t, x, y + i * 18);
+                doc.text(t, x, y + i * 18);
             });
             return y + texts.length * 18;
         }
     }
 
-    // === Add question ===
-    function addQuestion(q, qNum, x, y, colWidth) {
-        const stem = cleanText(q.stem);
-        const lines = doc.splitTextToSize(`Q${qNum}. ${stem}`, colWidth - 10);
+    function addQuestion(q, y) {
+        const maxWidth = 468;
+        const lines = doc.splitTextToSize(q.stem, maxWidth);
         lines.forEach(line => {
-            if (y > PAGE_HEIGHT - MARGIN) { doc.addPage(); y = MARGIN; }
-            doc.text(line, x, y);
-            y += 14;
-        });
-        y = drawChoices(q.choices, x, y, colWidth - 10) + 6;
-        if (q.group_id) {
-            doc.setFont('courier', 'italic');
-            doc.text(`(Situation: ${q.group_id})`, x, y);
-            doc.setFont('courier', 'normal');
+            if (y > 880) { doc.addPage(); y = 72; }
+            doc.text(line, 72, y);
             y += 16;
-        }
+        });
+        y = drawChoices(q.choices, 72, y, maxWidth) + 10;
         return y;
     }
 
-    // === Organize questions ===
-    const allQuestions = appState.fullQuestionBank.length ? appState.fullQuestionBank : getFallbackQuestions();
-    const groups = {};
-    allQuestions.forEach(q => {
-        if (!groups[q.group_id || `__single_${Math.random()}`]) groups[q.group_id || `__single_${Math.random()}`] = [];
-        groups[q.group_id || `__single_${Math.random()}`].push(q);
+    let y = 72;
+    noFigure.forEach(q => {
+        if (y > 880) { doc.addPage(); y = 72; }
+        y = addQuestion(q, y);
     });
 
-    // === Section 1: Questions (no figures) ===
-    let qNum = 1;
-    let col1Y = MARGIN, col2Y = MARGIN, currentCol = 1;
-
-    Object.keys(groups).forEach(gid => {
-        groups[gid].forEach(q => {
-            if (q.figure) return; // skip figure questions here
-            let y = currentCol === 1 ? col1Y : col2Y;
-            if (y > PAGE_HEIGHT - 200) {
-                if (currentCol === 1) { currentCol = 2; y = col2Y; }
-                else { doc.addPage(); col1Y = col2Y = MARGIN; currentCol = 1; y = col1Y; }
-            }
-            const x = currentCol === 1 ? MARGIN : MARGIN * 2 + COL_WIDTH;
-            const newY = addQuestion(q, qNum++, x, y, COL_WIDTH);
-            if (currentCol === 1) col1Y = newY; else col2Y = newY;
-        });
-    });
-
-    // === Section 2: Figures ===
-    doc.addPage();
-    doc.setFontSize(14);
-    doc.text('FIGURES SECTION', MARGIN, MARGIN);
-    doc.setFontSize(12);
-    let y = MARGIN + 20;
-
-    const seen = new Set();
-    allQuestions.forEach(q => {
-        if (q.figure && !seen.has(q.group_id)) {
-            seen.add(q.group_id);
-            if (y > PAGE_HEIGHT - 250) { doc.addPage(); y = MARGIN; }
-            doc.text(`Figure for group_id: ${q.group_id}`, MARGIN, y);
-            y += 16;
-            try {
-                const img = new Image();
-                img.src = q.figure;
-                img.onload = () => {
-                    const maxW = PAGE_WIDTH - 2 * MARGIN;
-                    const maxH = 300;
-                    let w = img.width, h = img.height;
-                    const ratio = Math.min(maxW / w, maxH / h);
-                    w *= ratio; h *= ratio;
-                    doc.addImage(img, 'JPEG', MARGIN, y, w, h);
-                };
-            } catch {
-                doc.text('(Figure not available)', MARGIN, y);
-            }
-            y += 320;
+    for (const [fig, qs] of Object.entries(figureGroups)) {
+        doc.addPage();
+        y = 72;
+        try {
+            const img = new Image();
+            img.src = fig;
+            await img.decode();
+            doc.addImage(img, 'JPEG', 72, y, 468, 200);
+            y += 220;
+        } catch {
+            doc.text(`[Figure missing: ${fig}]`, 72, y);
+            y += 20;
         }
-    });
+        qs.forEach(q => {
+            if (y > 880) { doc.addPage(); y = 72; }
+            y = addQuestion(q, y);
+        });
+    }
 
     doc.save('Optimized_Exam.pdf');
 }
 
+// ======================
+// FULL MOCK EXAM
+// ======================
+function startFullMockExam() {
+    resetExam();
+    appState.currentSection = 'AMSTHEC';
+    showScreen('instructions');
+}
 
-// Helper functions (same as your original)
+// ======================
+// FALLBACK QUESTIONS
+// ======================
+function getFallbackQuestions() {
+    const fallbackQuestions = [];
+    for (let i = 1; i <= 75; i++) {
+        let stem, choices, correctAnswer;
+        if (i <= 15) {
+            const groupNum = Math.ceil(i / 5);
+            const qInGroup = ((i - 1) % 5) + 1;
+            stem = `Situation: Algebraic Problem Set ${groupNum} - Solve: ${getAlgebraEquation(groupNum, qInGroup)}`;
+            choices = getAlgebraChoices(groupNum, qInGroup);
+            correctAnswer = getAlgebraAnswer(groupNum, qInGroup);
+        } else if (i <= 30) {
+            const groupNum = Math.ceil((i - 15) / 5);
+            const qInGroup = ((i - 16) % 5) + 1;
+            stem = `Situation: Geometric Analysis ${groupNum} - ${getGeometryQuestion(groupNum, qInGroup)}`;
+            choices = getGeometryChoices(groupNum, qInGroup);
+            correctAnswer = getGeometryAnswer(groupNum, qInGroup);
+        } else if (i <= 45) {
+            const groupNum = Math.ceil((i - 30) / 5);
+            const qInGroup = ((i - 31) % 5) + 1;
+            stem = `Situation: Surveying Problem ${groupNum} - ${getSurveyingQuestion(groupNum, qInGroup)}`;
+            choices = getSurveyingChoices(groupNum, qInGroup);
+            correctAnswer = getSurveyingAnswer(groupNum, qInGroup);
+        } else if (i <= 60) {
+            const groupNum = Math.ceil((i - 45) / 5);
+            const qInGroup = ((i - 46) % 5) + 1;
+            stem = `Situation: Transportation Design ${groupNum} - ${getTransportationQuestion(groupNum, qInGroup)}`;
+            choices = getTransportationChoices(groupNum, qInGroup);
+            correctAnswer = getTransportationAnswer(groupNum, qInGroup);
+        } else {
+            stem = `Mathematics & Surveying Question ${i}: ${getIndividualMathQuestion(i)}`;
+            choices = getIndividualMathChoices(i);
+            correctAnswer = getIndividualMathAnswer(i);
+        }
+        fallbackQuestions.push({
+            "section": "AMSTHEC",
+            "group_id": i <= 60 ? `AMSTHEC-G${Math.ceil(i/5)}` : null,
+            "stem": stem,
+            "choices": choices,
+            "correct_answer": correctAnswer,
+            "difficulty": Math.ceil(Math.random() * 3),
+            "term": "False",
+            "figure": i % 10 === 0 ? "https://cdn.jsdelivr.net/gh/saydyin/ce-exam@images/figures/M12-04H.jpg" : null
+        });
+    }
+    for (let i = 1; i <= 50; i++) {
+        let stem, choices, correctAnswer;
+        if (i <= 10) {
+            const groupNum = Math.ceil(i / 5);
+            const qInGroup = ((i - 1) % 5) + 1;
+            stem = `Situation: Fluid Mechanics Analysis ${groupNum} - ${getFluidMechanicsQuestion(groupNum, qInGroup)}`;
+            choices = getFluidMechanicsChoices(groupNum, qInGroup);
+            correctAnswer = getFluidMechanicsAnswer(groupNum, qInGroup);
+        } else if (i <= 20) {
+            const groupNum = Math.ceil((i - 10) / 5);
+            const qInGroup = ((i - 11) % 5) + 1;
+            stem = `Situation: Hydraulic System ${groupNum} - ${getHydraulicsQuestion(groupNum, qInGroup)}`;
+            choices = getHydraulicsChoices(groupNum, qInGroup);
+            correctAnswer = getHydraulicsAnswer(groupNum, qInGroup);
+        } else if (i <= 30) {
+            const groupNum = Math.ceil((i - 20) / 5);
+            const qInGroup = ((i - 21) % 5) + 1;
+            stem = `Situation: Soil Analysis ${groupNum} - ${getSoilMechanicsQuestion(groupNum, qInGroup)}`;
+            choices = getSoilMechanicsChoices(groupNum, qInGroup);
+            correctAnswer = getSoilMechanicsAnswer(groupNum, qInGroup);
+        } else {
+            stem = `Hydraulics & Geotechnical Question ${i}: ${getIndividualHPGEQuestion(i)}`;
+            choices = getIndividualHPGEChoices(i);
+            correctAnswer = getIndividualHPGEAnswer(i);
+        }
+        fallbackQuestions.push({
+            "section": "HPGE",
+            "group_id": i <= 30 ? `HPGE-G${Math.ceil(i/5)}` : null,
+            "stem": stem,
+            "choices": choices,
+            "correct_answer": correctAnswer,
+            "difficulty": Math.ceil(Math.random() * 3),
+            "term": "False",
+            "figure": i % 8 === 0 ? "https://via.placeholder.com/300x200?text=Hydro+Diagram" : null
+        });
+    }
+    for (let i = 1; i <= 75; i++) {
+        let stem, choices, correctAnswer;
+        if (i <= 15) {
+            const groupNum = Math.ceil(i / 5);
+            const qInGroup = ((i - 1) % 5) + 1;
+            stem = `Situation: Structural Analysis ${groupNum} - ${getStructuralAnalysisQuestion(groupNum, qInGroup)}`;
+            choices = getStructuralAnalysisChoices(groupNum, qInGroup);
+            correctAnswer = getStructuralAnalysisAnswer(groupNum, qInGroup);
+        } else if (i <= 30) {
+            const groupNum = Math.ceil((i - 15) / 5);
+            const qInGroup = ((i - 16) % 5) + 1;
+            stem = `Situation: Concrete Structure ${groupNum} - ${getConcreteDesignQuestion(groupNum, qInGroup)}`;
+            choices = getConcreteDesignChoices(groupNum, qInGroup);
+            correctAnswer = getConcreteDesignAnswer(groupNum, qInGroup);
+        } else if (i <= 45) {
+            const groupNum = Math.ceil((i - 30) / 5);
+            const qInGroup = ((i - 31) % 5) + 1;
+            stem = `Situation: Steel Structure ${groupNum} - ${getSteelDesignQuestion(groupNum, qInGroup)}`;
+            choices = getSteelDesignChoices(groupNum, qInGroup);
+            correctAnswer = getSteelDesignAnswer(groupNum, qInGroup);
+        } else if (i <= 60) {
+            const groupNum = Math.ceil((i - 45) / 5);
+            const qInGroup = ((i - 46) % 5) + 1;
+            stem = `Situation: Construction Project ${groupNum} - ${getConstructionQuestion(groupNum, qInGroup)}`;
+            choices = getConstructionChoices(groupNum, qInGroup);
+            correctAnswer = getConstructionAnswer(groupNum, qInGroup);
+        } else {
+            stem = `Structural Design Question ${i}: ${getIndividualPSADQuestion(i)}`;
+            choices = getIndividualPSADChoices(i);
+            correctAnswer = getIndividualPSADAnswer(i);
+        }
+        fallbackQuestions.push({
+            "section": "PSAD",
+            "group_id": i <= 60 ? `PSAD-G${Math.ceil(i/5)}` : null,
+            "stem": stem,
+            "choices": choices,
+            "correct_answer": correctAnswer,
+            "difficulty": Math.ceil(Math.random() * 3),
+            "term": "False",
+            "figure": i % 12 === 0 ? "https://via.placeholder.com/300x200?text=Structure+Diagram" : null
+        });
+    }
+    return fallbackQuestions;
+}
+
+// Helper functions
 function getAlgebraEquation(group, question) { return "2x + 5 = 15"; }
 function getAlgebraChoices(group, question) { return ["5", "6", "7", "8"]; }
 function getAlgebraAnswer(group, question) { return "A"; }
@@ -1118,7 +1148,6 @@ function getIndividualHPGEAnswer(index) { return "B"; }
 function getIndividualPSADQuestion(index) { return "Calculate natural frequency of building"; }
 function getIndividualPSADChoices(index) { return ["0.6 Hz", "0.7 Hz", "0.8 Hz", "0.9 Hz"]; }
 function getIndividualPSADAnswer(index) { return "C"; }
-
 function getSampleQuestions(sectionName) {
     return getFallbackQuestions().filter(q => q.section === sectionName);
 }
