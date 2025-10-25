@@ -12,6 +12,7 @@ const SECTIONS = {
         name: "HPGE",
         title: "Hydraulics & Geotechnical Engineering",
         total: 50,
+ 
         time: 4 * 60 * 60 // 4 hours in seconds
     },
     PSAD: {
@@ -52,15 +53,18 @@ const MOTIVATIONAL_QUOTES = [
 // ======================
 let appState = {
     view: 'loading',
-    settings: JSON.parse(localStorage.getItem('examSettings')) || {
+    settings: JSON.parse(localStorage.getItem('examSettings')) ||
+    {
         theme: 'light',
         fontSize: 'medium',
         autoSave: true,
         navigationMode: 'scroll'
     },
-    answers: JSON.parse(localStorage.getItem('examAnswers')) || {},
+    answers: JSON.parse(localStorage.getItem('examAnswers')) ||
+    {},
     results: JSON.parse(localStorage.getItem('examResults')) || {},
-    bookmarks: JSON.parse(localStorage.getItem('examBookmarks')) || [],
+    bookmarks: JSON.parse(localStorage.getItem('examBookmarks')) ||
+    [],
     currentSection: null,
     timeLeft: 0,
     timerInterval: null,
@@ -70,7 +74,6 @@ let appState = {
     isPaused: false, // 🔹 Added for pause/resume
     firstWrongIndex: null // 🔹 Added for scroll to first wrong
 };
-
 // ======================
 // QUESTION BANK MANAGEMENT
 // ======================
@@ -113,6 +116,7 @@ function processQuestionsWithGroups(questions) {
             const tempId = `__single_${Math.random().toString(36).substring(2, 10)}`;
             groupMap[tempId] = [question];
         }
+ 
     });
     const validGroups = [];
     const standaloneQuestions = [];
@@ -122,12 +126,14 @@ function processQuestionsWithGroups(questions) {
             if (hasSituationStem) {
                 const sortedGroup = [...group].sort((a, b) => 
                     a.stem.trim().startsWith('Situation') ? -1 : 
+  
                     b.stem.trim().startsWith('Situation') ? 1 : 0
                 );
                 validGroups.push(sortedGroup);
             } else {
                 standaloneQuestions.push(...group);
             }
+    
         } else {
             standaloneQuestions.push(...group);
         }
@@ -143,6 +149,7 @@ function processQuestionsWithGroups(questions) {
             for (let j = 0; j < toAdd; j++) {
                 result.push(shuffledSingles[singleIndex++]);
             }
+      
         });
         while (singleIndex < shuffledSingles.length) {
             result.push(shuffledSingles[singleIndex++]);
@@ -284,7 +291,8 @@ function startTimer() {
             clearInterval(appState.timerInterval);
             submitExam();
         }
-    }, 1000);
+    }, 
+    1000);
 }
 
 // ======================
@@ -324,24 +332,28 @@ function renderMainMenu() {
         const card = document.createElement('div');
         card.className = 'section-card';
         let buttonText = isCompleted ? 'Review Section' : (isPaused ? 'Continue Section' : 'Start Section');
-        let buttonClass = isCompleted ? 'btn-secondary' : 'btn-primary';
+        let buttonClass = 
+        isCompleted ? 'btn-secondary' : 'btn-primary';
 
         card.innerHTML = `
             <div class="section-card-header">
                 <h2 class="section-card-title">
                     <span>${['📐','🗺️','📊'][idx % 3]}</span>
                     ${section.name}
-                </h2>
+              
+            </h2>
                 ${isCompleted ? `<span class="section-card-score">${score.toFixed(1)}%</span>` : ''}
             </div>
             <p class="section-card-description">${section.title}</p>
-            <button class="btn ${buttonClass}" data-action="${isCompleted ? 'review' : (isPaused ? 'continue' : 'start')}" data-section="${section.name}">
+            <button type="button" class="btn ${buttonClass}" data-action="${isCompleted ?
+ 'review' : (isPaused ? 'continue' : 'start')}" data-section="${section.name}">
                 ${buttonText}
             </button>
             ${isCompleted ? `
                 <div class="progress-container">
                     <div class="progress-bar" style="width: ${score}%"></div>
-                </div>
+           
+             </div>
             ` : ''}
         `;
 
@@ -350,6 +362,7 @@ function renderMainMenu() {
             const timeDisplay = formatTime(appState.timeLeft);
             const timerEl = document.createElement('p');
             timerEl.className = 'paused-timer';
+     
             timerEl.textContent = `⏸ Time left: ${timeDisplay}`;
             timerEl.style.fontSize = '0.875rem';
             timerEl.style.color = 'var(--text-muted-light)';
@@ -362,12 +375,12 @@ function renderMainMenu() {
     // Start or Continue Section
     document.querySelectorAll('[data-action="start"], [data-action="continue"]').forEach(btn => {
         btn.addEventListener('click', (e) => {
+  
             const sectionName = e.target.dataset.section;
             appState.currentSection = sectionName;
             showScreen('instructions');
         });
     });
-
     // Review Section
     document.querySelectorAll('[data-action="review"]').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -375,7 +388,6 @@ function renderMainMenu() {
             showReviewScreen(sectionName);
         });
     });
-
     document.getElementById('btn-full-mock').addEventListener('click', startFullMockExam);
     document.getElementById('btn-settings').addEventListener('click', showSettingsScreen);
     document.getElementById('btn-bookmarks').addEventListener('click', showBookmarksScreen);
@@ -432,33 +444,40 @@ function renderExam() {
         questionCard.className = 'question-card';
         questionCard.id = `question-${index}`;
         const bookmarkIcon = isBookmarked ? '🔖' : '📖';
+ 
         const bookmarkClass = isBookmarked ? 'btn-primary' : 'btn-secondary';
         questionCard.innerHTML = `
             <div class="question-header">
                 <div>
                     <p class="question-number">Question ${index + 1}</p>
-                    ${question.group_id ? `<p class="question-group">Situation: ${question.group_id}</p>` : ''}
+                    ${question.group_id ? `<p 
+ class="question-group">Situation: ${question.group_id}</p>` : ''}
                 </div>
-                <button class="btn ${bookmarkClass} btn-sm" data-bookmark="${index}">
+                <button type="button" class="btn ${bookmarkClass} btn-sm" data-bookmark="${index}">
                     ${bookmarkIcon}
                 </button>
             </div>
-            <p class="question-stem whitespace-pre-wrap">${question.stem}</p>
-            ${question.figure ? `
+            <p 
+ class="question-stem whitespace-pre-wrap">${question.stem}</p>
+            ${question.figure ?
+ `
                 <div class="question-image">
                     <img src="${question.figure}" alt="Figure for question ${index + 1}" data-figure="${question.figure}">
                 </div>
             ` : ''}
             <div class="choices-container">
-                ${question.choices.map((choice, choiceIndex) => {
+            
+         ${question.choices.map((choice, choiceIndex) => {
                     const letter = String.fromCharCode(65 + choiceIndex);
                     const isSelected = userAnswer === letter;
                     return `
-                        <button class="choice-btn ${isSelected ? 'selected' : ''}" data-question="${index}" data-choice="${letter}">
+                      
+                   <button type="button" class="choice-btn ${isSelected ? 'selected' : ''}" data-question="${index}" data-choice="${letter}">
                             <span class="choice-letter">${letter}.</span>
                             <span>${choice.trim()}</span>
                         </button>
-                    `;
+         
+                 `;
                 }).join('')}
             </div>
         `;
@@ -471,6 +490,7 @@ function renderExam() {
             const isNowBookmarked = toggleBookmark(appState.currentSection, index);
             button.className = `btn ${isNowBookmarked ? 'btn-primary' : 'btn-secondary'} btn-sm`;
             button.innerHTML = isNowBookmarked ? '🔖' : '📖';
+ 
         });
     });
     document.querySelectorAll('.choice-btn').forEach(btn => {
@@ -480,14 +500,16 @@ function renderExam() {
             const choice = btnEl.dataset.choice;
             selectAnswer(questionIndex, choice);
             const questionCard = document.getElementById(`question-${questionIndex}`);
-            questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => {
+            questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => 
+            {
                 choiceBtn.classList.remove('selected');
             });
             btnEl.classList.add('selected');
             const nextIndex = questionIndex + 1;
             const nextEl = document.getElementById(`question-${nextIndex}`);
             if (nextEl) {
-                const header = document.querySelector('.exam-header');
+              
+                 const header = document.querySelector('.exam-header');
                 const headerHeight = header ? header.offsetHeight : 60;
                 const elementPosition = nextEl.getBoundingClientRect().top + window.scrollY;
                 const offsetPosition = elementPosition - headerHeight - 10;
@@ -543,12 +565,14 @@ function submitExam() {
             wrongAnswers.push({
                 number: index + 1,
                 stem: question.stem,
+    
                 user_answer: userAnswer,
                 correct_answer: question.correct_answer,
                 choices: question.choices,
                 explanation: question.explanation,
                 figure: question.figure
             });
+       
         }
     });
 
@@ -607,36 +631,45 @@ function showResultsScreen(sectionName) {
             wrong.choices.forEach((choice, index) => {
                 const letter = String.fromCharCode(65 + index);
                 const isCorrect = letter === wrong.correct_answer;
+              
                 const isUser = letter === wrong.user_answer;
                 let choiceClass = 'choice-btn';
                 if (isCorrect) choiceClass += ' bg-green-100 border-green-500';
                 else if (isUser) choiceClass += ' bg-red-100 border-red-500';
                 choicesHtml += `
-                    <div class="${choiceClass}">
+           
+                 <div class="${choiceClass}">
                         <span class="choice-letter">${letter}.</span>
                         <span>${choice}</span>
                     </div>
                 `;
+     
             });
             wrongAnswersHTML += `
                 <div class="wrong-answer-card">
                     <div class="question-header">
                         <p class="question-number">Question ${wrong.number}</p>
-                    </div>
+               
+                     </div>
                     <p class="question-stem whitespace-pre-wrap">${wrong.stem}</p>
-                    ${wrong.figure ? `
+                    ${wrong.figure ?
+ `
                         <div class="question-image">
                             <img src="${wrong.figure}" alt="Figure for question ${wrong.number}" data-figure="${wrong.figure}">
                         </div>
+                 
                     ` : ''}
                     <div class="choices-container">${choicesHtml}</div>
                     <div class="answer-comparison">
-                        <p class="user-answer">Your Answer: ${wrong.user_answer || "Not Answered"}</p>
+                        <p class="user-answer">Your Answer: ${wrong.user_answer ||
+ "Not Answered"}</p>
                         <p class="correct-answer">Correct Answer: ${wrong.correct_answer}</p>
-                        ${wrong.explanation ? `
+                        ${wrong.explanation ?
+ `
                             <div class="explanation">
                                 <p class="explanation-title">Explanation:</p>
                                 <p>${wrong.explanation}</p>
+      
                             </div>
                         ` : ''}
                     </div>
@@ -651,27 +684,30 @@ function showResultsScreen(sectionName) {
             </div>
             <div class="card results-score">
                 <p class="score-percentage ${passed ? 'score-passed' : 'score-failed'}">${result.score_pct.toFixed(2)}%</p>
+     
                 <p class="score-details">${result.correct} / ${result.total} Correct</p>
-                <p class="score-status ${passed ? 'score-passed' : 'score-failed'}">${passed ? 'PASSED' : 'FAILED'}</p>
+                <p class="score-status ${passed ? 'score-passed' : 'score-failed'}">${passed ?
+ 'PASSED' : 'FAILED'}</p>
             </div>
             <div class="action-buttons">
-                <button id="btn-review-all" class="btn">Review All Questions</button>
-                <button id="btn-continue" class="btn btn-primary">Continue</button>
+                <button type="button" id="btn-review-all" class="btn">Review All Questions</button>
+                <button type="button" id="btn-continue" class="btn btn-primary">Continue</button>
             </div>
-            ${result.wrong.length > 0 ? `
+            ${result.wrong.length > 0 ?
+ `
                 <div class="wrong-answers-section">
                     <h2 class="wrong-answers-title">Incorrect Answers Review</h2>
                     <div id="wrong-answers-list">${wrongAnswersHTML}</div>
                 </div>
             ` : ''}
-            <button id="btn-back-to-main" class="btn btn-secondary">Back to Main Menu</button>
+         
+            <button type="button" id="btn-back-to-main" class="btn btn-secondary">Back to Main Menu</button>
         </div>
     `;
     showScreen('results');
 
     // 🔹 Always scroll to top of results
     window.scrollTo({ top: 0, behavior: 'auto' });
-
     document.querySelectorAll('#wrong-answers-list img[data-figure]').forEach(img => {
         img.addEventListener('click', () => {
             document.getElementById('zoomed-image').src = img.src;
@@ -698,12 +734,14 @@ function showReviewScreen(sectionName) {
                 <div class="question-header">
                     <div>
                         <h1>Review Answers</h1>
-                        <p class="section-subtitle">${SECTIONS[sectionName].title}</p>
+             
+                       <p class="section-subtitle">${SECTIONS[sectionName].title}</p>
                     </div>
-                    <button id="btn-review-back" class="btn btn-secondary">Back</button>
+                    <button type="button" id="btn-review-back" class="btn btn-secondary">Back</button>
                 </div>
                 <div id="review-questions-list"></div>
-            </div>
+            
+             </div>
         </div>
     `;
     screen.innerHTML = content;
@@ -716,13 +754,15 @@ function showReviewScreen(sectionName) {
         question.choices.forEach((choice, choiceIndex) => {
             const letter = String.fromCharCode(65 + choiceIndex);
             const isCorrectAnswer = letter === question.correct_answer;
-            const isUserAnswer = letter === userAnswer;
+            const 
+            isUserAnswer = letter === userAnswer;
             let choiceClass = 'choice-btn';
             if (isCorrectAnswer) choiceClass += ' bg-green-100 border-green-500';
             else if (isUserAnswer && !isCorrect) choiceClass += ' bg-red-100 border-red-500';
             choicesHtml += `
                 <div class="${choiceClass}">
-                    <span class="choice-letter">${letter}.</span>
+           
+                     <span class="choice-letter">${letter}.</span>
                     <span>${choice}</span>
                 </div>
             `;
@@ -733,24 +773,30 @@ function showReviewScreen(sectionName) {
         card.innerHTML = `
             <div class="question-header">
                 <p class="question-number">Question ${index + 1}</p>
-                ${question.group_id ? `<p class="question-group">Situation: ${question.group_id}</p>` : ''}
+                ${question.group_id ?
+ `<p class="question-group">Situation: ${question.group_id}</p>` : ''}
             </div>
             <p class="question-stem whitespace-pre-wrap">${question.stem}</p>
-            ${question.figure ? `
+            ${question.figure ?
+ `
                 <div class="question-image">
                     <img src="${question.figure}" alt="Figure for question ${index + 1}" data-figure="${question.figure}">
                 </div>
             ` : ''}
             <div class="choices-container">${choicesHtml}</div>
-            <div class="answer-comparison">
-                <p>Your Answer: <span class="${isCorrect ? 'correct-answer' : 'user-answer'}">${userAnswer || "Not Answered"}</span></p>
+            
+             <div class="answer-comparison">
+                <p>Your Answer: <span class="${isCorrect ? 'correct-answer' : 'user-answer'}">${userAnswer ||
+ "Not Answered"}</span></p>
                 <p class="correct-answer">Correct Answer: ${question.correct_answer}</p>
-                ${question.explanation ? `
+                ${question.explanation ?
+ `
                     <div class="explanation">
                         <p class="explanation-title">Explanation:</p>
                         <p>${question.explanation}</p>
                     </div>
-                ` : ''}
+          
+               ` : ''}
             </div>
         `;
         list.appendChild(card);
@@ -761,7 +807,6 @@ function showReviewScreen(sectionName) {
             document.getElementById('image-modal').classList.remove('hidden');
         });
     });
-
     // 🔹 Scroll to first wrong question if available
     if (appState.firstWrongIndex !== null) {
         const firstWrongEl = document.getElementById(`question-${appState.firstWrongIndex}`);
@@ -816,7 +861,8 @@ function showBookmarksScreen() {
                 <div class="card bookmark-item">
                     <div class="bookmark-info">
                         <span>${bookmark.section} – Q${bookmark.questionIndex + 1}</span>
-                        <button class="btn btn-secondary btn-sm" data-go="${bookmark.section}-${bookmark.questionIndex}">Go</button>
+                 
+                       <button type="button" class="btn btn-secondary btn-sm" data-go="${bookmark.section}-${bookmark.questionIndex}">Go</button>
                     </div>
                 </div>
             `;
@@ -830,6 +876,7 @@ function showBookmarksScreen() {
                 appState.currentSection = section;
                 loadQuestionsForSection(section);
                 showScreen('exam');
+      
                 setTimeout(() => {
                     const el = document.getElementById(`question-${index}`);
                     if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -870,18 +917,21 @@ function showAnalyticsScreen() {
             const passed = result.score_pct >= 70;
             content += `
                 <div class="card analytics-card">
-                    <h2>${section.title}</h2>
+                   
+                 <h2>${section.title}</h2>
                     <p class="section-subtitle">${section.name}</p>
                     <div class="analytics-score">
                         <p class="score-percentage ${passed ? 'score-passed' : 'score-failed'}">${result.score_pct.toFixed(2)}%</p>
-                        <p>${result.correct} / ${result.total} Correct</p>
+                        <p>${result.correct} / ${result.total} 
+ Correct</p>
                     </div>
                     <div class="analytics-details">
                         <div class="detail-item"><span>Correct Answers:</span><span>${result.correct}</span></div>
                         <div class="detail-item"><span>Incorrect Answers:</span><span>${result.wrong.length}</span></div>
-                        <div class="detail-item"><span>Unanswered:</span><span>${result.total - result.correct - result.wrong.length}</span></div>
+       
+                         <div class="detail-item"><span>Unanswered:</span><span>${result.total - result.correct - result.wrong.length}</span></div>
                     </div>
-                    <button class="btn btn-text" data-review="${sectionName}">Review Wrong Answers</button>
+                    <button type="button" class="btn btn-text" data-review="${sectionName}">Review Wrong Answers</button>
                 </div>
             `;
         });
@@ -914,6 +964,7 @@ function renderQuestionsOnly(questions, container) {
             situationHeader.textContent = `Situation ${currentGroup}`;
             container.appendChild(situationHeader);
         }
+ 
         const card = document.createElement('div');
         card.className = 'question-card';
         card.innerHTML = `
@@ -921,12 +972,14 @@ function renderQuestionsOnly(questions, container) {
             <p class="question-stem">${q.stem}</p>
             <div class="choices-container">
                 ${q.choices.map((c, i) => `
-                    <div class="choice-line">
+         
+                     <div class="choice-line">
                         <strong>${String.fromCharCode(65 + i)}.</strong> ${c}
                     </div>
                 `).join('')}
             </div>
         `;
+     
         container.appendChild(card);
     });
 }
@@ -939,7 +992,8 @@ function renderFiguresOnly(questions, container) {
             figCard.className = 'figure-card';
             figCard.innerHTML = `
                 <p class="figure-label">Figure for Question ${idx + 1}</p>
-                <img src="${q.figure}" alt="Figure for Question ${idx + 1}">
+                <img src="${q.figure}" alt="Figure for Question ${idx 
+ + 1}">
             `;
             container.appendChild(figCard);
         }
@@ -957,14 +1011,11 @@ async function generateOfflinePDF() {
         unit: 'pt',
         format: [612, 936] // Legal: 8.5" x 13"
     });
-
     // Get all questions
     const allQuestions = appState.fullQuestionBank.length ? appState.fullQuestionBank : getFallbackQuestions();
-
     // Render questions
     const questionsContainer = document.getElementById('printable-questions');
     renderQuestionsOnly(allQuestions, questionsContainer);
-
     // Add questions to PDF
     await doc.html(questionsContainer, {
         callback: function (doc) {
@@ -973,17 +1024,20 @@ async function generateOfflinePDF() {
             renderFiguresOnly(allQuestions, figuresContainer);
             if (figuresContainer.children.length > 0) {
                 doc.addPage();
+     
                 doc.html(figuresContainer, {
                     callback: function (doc) {
                         doc.save('Civil_Engineering_Exam.pdf');
                     },
-                    x: 40,
+                    x: 
+ 40,
                     y: 40,
                     width: 532,
                     windowWidth: 800
                 });
             } else {
-                doc.save('Civil_Engineering_Exam.pdf');
+       
+                 doc.save('Civil_Engineering_Exam.pdf');
             }
         },
         x: 40,
@@ -1131,47 +1185,73 @@ function getFallbackQuestions() {
 }
 
 // Helper functions
-function getAlgebraEquation(group, question) { return "2x + 5 = 15"; }
+function getAlgebraEquation(group, question) { return "2x + 5 = 15";
+}
 function getAlgebraChoices(group, question) { return ["5", "6", "7", "8"]; }
-function getAlgebraAnswer(group, question) { return "A"; }
-function getGeometryQuestion(group, question) { return "Calculate the area of a triangle with base 8m and height 5m"; }
+function getAlgebraAnswer(group, question) { return "A";
+}
+function getGeometryQuestion(group, question) { return "Calculate the area of a triangle with base 8m and height 5m";
+}
 function getGeometryChoices(group, question) { return ["20 m²", "25 m²", "30 m²", "35 m²"]; }
-function getGeometryAnswer(group, question) { return "A"; }
-function getSurveyingQuestion(group, question) { return "A level instrument reading at A is 2.5m and at B is 1.8m. What is the elevation difference?"; }
+function getGeometryAnswer(group, question) { return "A";
+}
+function getSurveyingQuestion(group, question) { return "A level instrument reading at A is 2.5m and at B is 1.8m. What is the elevation difference?";
+}
 function getSurveyingChoices(group, question) { return ["0.7 m", "0.8 m", "0.9 m", "1.0 m"]; }
-function getSurveyingAnswer(group, question) { return "A"; }
-function getTransportationQuestion(group, question) { return "Calculate the stopping sight distance for a vehicle at 80 km/h"; }
+function getSurveyingAnswer(group, question) { return "A";
+}
+function getTransportationQuestion(group, question) { return "Calculate the stopping sight distance for a vehicle at 80 km/h";
+}
 function getTransportationChoices(group, question) { return ["100 m", "110 m", "120 m", "130 m"]; }
-function getTransportationAnswer(group, question) { return "C"; }
-function getFluidMechanicsQuestion(group, question) { return "Calculate the pressure at a depth of 10m in water"; }
+function getTransportationAnswer(group, question) { return "C";
+}
+function getFluidMechanicsQuestion(group, question) { return "Calculate the pressure at a depth of 10m in water";
+}
 function getFluidMechanicsChoices(group, question) { return ["98 kPa", "100 kPa", "102 kPa", "105 kPa"]; }
-function getFluidMechanicsAnswer(group, question) { return "A"; }
-function getHydraulicsQuestion(group, question) { return "Calculate discharge through a 3m wide channel with depth 2m and velocity 1.5 m/s"; }
+function getFluidMechanicsAnswer(group, question) { return "A";
+}
+function getHydraulicsQuestion(group, question) { return "Calculate discharge through a 3m wide channel with depth 2m and velocity 1.5 m/s";
+}
 function getHydraulicsChoices(group, question) { return ["8 m³/s", "9 m³/s", "10 m³/s", "11 m³/s"]; }
-function getHydraulicsAnswer(group, question) { return "B"; }
-function getSoilMechanicsQuestion(group, question) { return "Calculate void ratio for soil with G=2.65, w=20%, S=80%"; }
+function getHydraulicsAnswer(group, question) { return "B";
+}
+function getSoilMechanicsQuestion(group, question) { return "Calculate void ratio for soil with G=2.65, w=20%, S=80%";
+}
 function getSoilMechanicsChoices(group, question) { return ["0.66", "0.70", "0.74", "0.78"]; }
-function getSoilMechanicsAnswer(group, question) { return "A"; }
-function getStructuralAnalysisQuestion(group, question) { return "Max bending moment in 6m beam with 20 kN/m UDL"; }
+function getSoilMechanicsAnswer(group, question) { return "A";
+}
+function getStructuralAnalysisQuestion(group, question) { return "Max bending moment in 6m beam with 20 kN/m UDL";
+}
 function getStructuralAnalysisChoices(group, question) { return ["80 kN·m", "85 kN·m", "90 kN·m", "95 kN·m"]; }
-function getStructuralAnalysisAnswer(group, question) { return "C"; }
-function getConcreteDesignQuestion(group, question) { return "Moment capacity of 300x500mm beam with 4-20mm bars"; }
+function getStructuralAnalysisAnswer(group, question) { return "C";
+}
+function getConcreteDesignQuestion(group, question) { return "Moment capacity of 300x500mm beam with 4-20mm bars";
+}
 function getConcreteDesignChoices(group, question) { return ["160 kN·m", "170 kN·m", "180 kN·m", "190 kN·m"]; }
-function getConcreteDesignAnswer(group, question) { return "B"; }
-function getSteelDesignQuestion(group, question) { return "Tension strength of 200x10mm steel plate, fy=250 MPa"; }
+function getConcreteDesignAnswer(group, question) { return "B";
+}
+function getSteelDesignQuestion(group, question) { return "Tension strength of 200x10mm steel plate, fy=250 MPa";
+}
 function getSteelDesignChoices(group, question) { return ["480 kN", "500 kN", "520 kN", "540 kN"]; }
-function getSteelDesignAnswer(group, question) { return "B"; }
-function getConstructionQuestion(group, question) { return "Duration of critical path in project network"; }
+function getSteelDesignAnswer(group, question) { return "B";
+}
+function getConstructionQuestion(group, question) { return "Duration of critical path in project network";
+}
 function getConstructionChoices(group, question) { return ["22 days", "24 days", "26 days", "28 days"]; }
-function getConstructionAnswer(group, question) { return "B"; }
+function getConstructionAnswer(group, question) { return "B";
+}
 function getIndividualMathQuestion(index) { return "Solve dy/dx = 2x"; }
-function getIndividualMathChoices(index) { return ["x² + C", "2x² + C", "x + C", "2x + C"]; }
+function getIndividualMathChoices(index) { return ["x² + C", "2x² + C", "x + C", "2x + C"];
+}
 function getIndividualMathAnswer(index) { return "A"; }
-function getIndividualHPGEQuestion(index) { return "Calculate permeability from falling head test"; }
+function getIndividualHPGEQuestion(index) { return "Calculate permeability from falling head test";
+}
 function getIndividualHPGEChoices(index) { return ["1×10⁻⁵ cm/s", "2×10⁻⁵ cm/s", "3×10⁻⁵ cm/s", "4×10⁻⁵ cm/s"]; }
-function getIndividualHPGEAnswer(index) { return "B"; }
+function getIndividualHPGEAnswer(index) { return "B";
+}
 function getIndividualPSADQuestion(index) { return "Calculate natural frequency of building"; }
-function getIndividualPSADChoices(index) { return ["0.6 Hz", "0.7 Hz", "0.8 Hz", "0.9 Hz"]; }
+function getIndividualPSADChoices(index) { return ["0.6 Hz", "0.7 Hz", "0.8 Hz", "0.9 Hz"];
+}
 function getIndividualPSADAnswer(index) { return "C"; }
 function getSampleQuestions(sectionName) {
     return getFallbackQuestions().filter(q => q.section === sectionName);
@@ -1193,6 +1273,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => showScreen('main-menu'), 1000);
     }
     document.getElementById('close-image-modal').onclick = () => {
+  
         document.getElementById('image-modal').classList.add('hidden');
     };
     document.getElementById('image-modal').onclick = (e) => {
