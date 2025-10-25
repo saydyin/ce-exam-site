@@ -899,3 +899,36 @@ body.dark {
 .border-red-500 {
     border-color: var(--danger-color);
 }
+/* ===== PRINT STYLES FOR TWO-COLUMN EXAM LAYOUT ===== */
+@media print {
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+  body {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 11pt;
+    line-height: 1.3;
+  }
+  .questions-container {
+    column-count: 2;
+    column-gap: 0.3in;
+  }
+  .question-card {
+    break-inside: avoid;
+    box-shadow: none;
+    border: none;
+    padding: 0 0 12pt 0;
+    margin: 0;
+  }
+  .exam-header, .exam-controls, .action-buttons, .nav-buttons, .btn, .modal-overlay {
+    display: none !important;
+  }
+  .question-number {
+    font-weight: bold;
+  }
+  .choice-letter {
+    font-weight: bold;
+    margin-right: 0.3em;
+  }
+}
