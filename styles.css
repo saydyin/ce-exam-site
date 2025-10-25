@@ -659,7 +659,7 @@ body.dark {
     margin-bottom: 0.5rem;
 }
 .review-question-card .question-number {
-    color: #374151; /* Neutral color for review */
+    color: #374151;
 }
 .dark .review-question-card .question-number {
     color: var(--text-muted-dark);
@@ -673,27 +673,25 @@ body.dark {
 .dark .review-question-card .choices-container .choice-btn:hover {
     border-color: var(--border-dark);
 }
-/* Correct Answer in Review */
 .review-question-card .choice-btn[data-correct="true"] {
-    background: #d1fae5; /* Green 100 */
+    background: #d1fae5;
     border-color: var(--success-color);
     color: var(--success-color);
     box-shadow: 0 0 0 2px var(--success-color);
 }
 .dark .review-question-card .choice-btn[data-correct="true"] {
-    background: #064e3b; /* Dark Green */
+    background: #064e3b;
     border-color: var(--success-color);
     color: var(--success-color);
 }
-/* User's Wrong Answer in Review */
 .review-question-card .choice-btn.selected:not([data-correct="true"]) {
-    background: #fee2e2; /* Red 100 */
+    background: #fee2e2;
     border-color: var(--danger-color);
     color: var(--danger-color);
     box-shadow: 0 0 0 2px var(--danger-color);
 }
 .dark .review-question-card .choice-btn.selected:not([data-correct="true"]) {
-    background: #7f1d1d; /* Dark Red */
+    background: #7f1d1d;
     border-color: var(--danger-color);
     color: var(--danger-color);
 }
@@ -820,7 +818,6 @@ body.dark {
 .dark .modal-content {
     background: var(--bg-dark);
 }
-/* Image Modal */
 .modal-content img {
     max-width: 100%;
     max-height: 80vh;
@@ -857,7 +854,6 @@ body.dark {
     max-width: 100%;
     height: auto;
 }
-/* Confirmation Modal */
 .confirm-modal {
     text-align: center;
     padding: 2rem;
@@ -883,7 +879,7 @@ body.dark {
 
 /* ===== FONT SIZES ===== */
 body.font-small {
-    font-size: 0.875rem; /* 14px */
+    font-size: 0.875rem;
 }
 body.font-small .header h1 {
     font-size: 1.75rem;
@@ -892,7 +888,7 @@ body.font-small .timer {
     font-size: 1.25rem;
 }
 body.font-large {
-    font-size: 1.125rem; /* 18px */
+    font-size: 1.125rem;
 }
 body.font-large .header h1 {
     font-size: 2.25rem;
@@ -901,7 +897,7 @@ body.font-large .timer {
     font-size: 1.75rem;
 }
 
-/* ===== PDF/PRINT STYLES (Hidden Container) ===== */
+/* ===== PDF/PRINT STYLES ===== */
 .printable-container {
     padding: 0.5in;
     font-size: 10pt;
@@ -967,7 +963,6 @@ body.font-large .timer {
     height: auto;
 }
 
-/* ===== PRINT MEDIA QUERY (for browser print) ===== */
 @media print {
   @page {
     size: letter;
