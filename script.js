@@ -78,7 +78,7 @@ let appState = {
 // ======================
 async function loadQuestionBank() {
     try {
-        const response = await fetch('data/question_bank.json');
+        const response = await fetch('question_bank.json');
         if (!response.ok) {
             throw new Error(`Failed to load question bank: ${response.status}`);
         }
@@ -237,7 +237,7 @@ function renderMainMenu() {
         card.innerHTML = `
             <div class="section-card-header">
                 <h2 class="section-card-title">
-                    <span>${['📐','🏗️','📊'][idx % 3]}</span>
+                    <span>${['📐','🗺️','📊'][idx % 3]}</span>
                     ${section.name}
                 </h2>
                 ${isCompleted ? `<span class="section-card-score">${score.toFixed(1)}%</span>` : ''}
@@ -312,10 +312,23 @@ function renderInstructions() {
 // EXAM SCREEN
 // ======================
 function loadQuestionsForSection(sectionName) {
-    const sectionQuestions = getQuestionsForSection(sectionName);
-    appState.examQuestions = sectionQuestions;
+    // Check if we already have saved questions for this section
+    const savedKey = `examQuestions_${sectionName}`;
+    const savedQuestions = localStorage.getItem(savedKey);
     
-    console.log(`Loaded ${sectionQuestions.length} questions for ${sectionName}`);
+    let sectionQuestions;
+    if (savedQuestions) {
+        // Use previously saved questions to maintain consistency
+        sectionQuestions = JSON.parse(savedQuestions);
+        console.log(`Loaded ${sectionQuestions.length} saved questions for ${sectionName}`);
+    } else {
+        // Generate new questions and save them
+        sectionQuestions = getQuestionsForSection(sectionName);
+        localStorage.setItem(savedKey, JSON.stringify(sectionQuestions));
+        console.log(`Generated and saved ${sectionQuestions.length} new questions for ${sectionName}`);
+    }
+    
+    appState.examQuestions = sectionQuestions;
     
     if (!appState.answers[sectionName]) {
         appState.answers[sectionName] = new Array(sectionQuestions.length).fill(null);
@@ -366,7 +379,7 @@ function renderExam() {
                     ${question.group_id ? `<p class="question-group">Situation: ${question.group_id}</p>` : ''}
                 </div>
                 <button class="btn ${isBookmarked ? 'btn-primary' : 'btn-secondary'} btn-sm" data-bookmark="${index}">
-                    🔖
+                    📖
                 </button>
             </div>
             <p class="question-stem whitespace-pre-wrap">${question.stem}</p>
@@ -608,7 +621,20 @@ function showResultsScreen(sectionName) {
 // REVIEW SCREEN
 // ======================
 function showReviewScreen(sectionName) {
-    const questions = getQuestionsForSection(sectionName);
+    // Load the saved questions for this section to ensure consistency
+    const savedKey = `examQuestions_${sectionName}`;
+    const savedQuestions = localStorage.getItem(savedKey);
+    
+    let questions;
+    if (savedQuestions) {
+        questions = JSON.parse(savedQuestions);
+        console.log(`Loaded ${questions.length} saved questions for review of ${sectionName}`);
+    } else {
+        // Fallback: generate questions if none saved (shouldn't happen if exam was completed)
+        questions = getQuestionsForSection(sectionName);
+        console.warn(`No saved questions found for ${sectionName}, generating new ones`);
+    }
+    
     const answers = appState.answers[sectionName] || [];
     
     const screen = document.createElement('div');
@@ -798,7 +824,7 @@ function showBookmarksScreen() {
     
     let content = `
         <div class="container">
-            <h1 class="section-title">🔖 Bookmarked Questions</h1>
+            <h1 class="section-title">📖 Bookmarked Questions</h1>
     `;
     
     if (appState.bookmarks.length === 0) {
@@ -814,7 +840,7 @@ function showBookmarksScreen() {
             content += `
                 <div class="card bookmark-item">
                     <div class="bookmark-info">
-                        <span>${bookmark.section} — Q${bookmark.questionIndex + 1}</span>
+                        <span>${bookmark.section} – Q${bookmark.questionIndex + 1}</span>
                         <button class="btn btn-secondary btn-sm" data-go="${bookmark.section}-${bookmark.questionIndex}">Go</button>
                     </div>
                 </div>
@@ -966,6 +992,11 @@ function resetExam() {
     localStorage.removeItem('examAnswers');
     localStorage.removeItem('examResults');
     localStorage.removeItem('examBookmarks');
+    
+    // Clear saved exam questions
+    Object.keys(SECTIONS).forEach(sectionName => {
+        localStorage.removeItem(`examQuestions_${sectionName}`);
+    });
     
     showScreen('main-menu');
 }
