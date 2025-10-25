@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Civil Engineering Exam Simulator</title>
   <link rel="stylesheet" href="styles.css">
+  <!-- External Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
 </head>
 <body>
   <div id="screen-loading" class="screen">
@@ -14,6 +16,7 @@
       <p>Preparing Your Exam...</p>
     </div>
   </div>
+
   <div id="screen-main-menu" class="screen hidden">
     <div class="container">
       <div class="header">
@@ -22,17 +25,18 @@
       </div>
       <div id="section-grid" class="section-grid"></div>
       <div class="action-buttons">
-        <button id="btn-full-mock" class="btn btn-primary">🚀 Start Full Mock Exam</button>
+        <button type="button" id="btn-full-mock" class="btn btn-primary">🚀 Start Full Mock Exam</button>
         <div class="nav-buttons">
-          <button id="btn-settings" class="btn btn-secondary">⚙️ Settings</button>
-          <button id="btn-bookmarks" class="btn btn-secondary">🔖 Bookmarks</button>
-          <button id="btn-analytics" class="btn btn-secondary">📊 Analytics</button>
-          <button id="btn-download-pdf" class="btn btn-secondary">📄 Download for Offline</button>
+          <button type="button" id="btn-settings" class="btn btn-secondary">⚙️ Settings</button>
+          <button type="button" id="btn-bookmarks" class="btn btn-secondary">🔖 Bookmarks</button>
+          <button type="button" id="btn-analytics" class="btn btn-secondary">📊 Analytics</button>
+          <button type="button" id="btn-download-pdf" class="btn btn-secondary">📄 Download for Offline</button>
         </div>
-        <button id="btn-reset" class="btn btn-danger">🗑️ Reset Exam Data</button>
+        <button type="button" id="btn-reset" class="btn btn-danger">🗑️ Reset Exam Data</button>
       </div>
     </div>
   </div>
+
   <div id="screen-instructions" class="screen hidden">
     <div class="container">
       <div class="card">
@@ -44,12 +48,13 @@
         </div>
         <div id="motivational-quote" class="quote"></div>
         <div class="action-buttons">
-          <button id="btn-instructions-back" class="btn btn-secondary">Back to Main Menu</button>
-          <button id="btn-start-exam" class="btn btn-primary">Start Exam Section</button>
+          <button type="button" id="btn-instructions-back" class="btn btn-secondary">Back to Main Menu</button>
+          <button type="button" id="btn-start-exam" class="btn btn-primary">Start Exam Section</button>
         </div>
       </div>
     </div>
   </div>
+
   <div id="screen-exam" class="screen hidden">
     <header class="exam-header">
       <div class="container">
@@ -59,12 +64,12 @@
         </div>
         <div class="exam-controls">
           <div id="exam-timer" class="timer">05:00:00</div>
-          <button id="btn-pause-resume" class="btn btn-secondary">
+          <button type="button" id="btn-pause-resume" class="btn btn-secondary">
             <svg class="icon" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6"></path>
             </svg> Pause
           </button>
-          <button id="btn-submit-exam" class="btn btn-primary">
+          <button type="button" id="btn-submit-exam" class="btn btn-primary">
             <svg class="icon" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
             </svg> Submit
@@ -73,16 +78,16 @@
       </div>
     </header>
     <main class="exam-content">
-      <div id="exam-questions-container" class="questions-container">
-        </div>
+      <div id="exam-questions-container" class="questions-container"></div>
     </main>
     <footer class="exam-footer">
       <div class="container">
-        <button id="btn-jump-to-first" class="btn btn-secondary btn-sm">Jump to first unanswered</button>
-        <button id="btn-nav-next" class="btn btn-primary btn-sm hidden">Next Question</button>
+        <button type="button" id="btn-jump-to-first" class="btn btn-secondary btn-sm">Jump to first unanswered</button>
+        <button type="button" id="btn-nav-next" class="btn btn-primary btn-sm hidden">Next Question</button>
       </div>
     </footer>
   </div>
+
   <div id="screen-settings" class="screen hidden">
     <div class="container">
       <div class="card">
@@ -90,51 +95,52 @@
         <div class="settings-group">
           <h2>Theme</h2>
           <div class="theme-switcher">
-            <button id="theme-light" class="btn btn-secondary">☀️ Light</button>
-            <button id="theme-dark" class="btn btn-secondary">🌙 Dark</button>
+            <button type="button" id="theme-light" class="btn btn-secondary">☀️ Light</button>
+            <button type="button" id="theme-dark" class="btn btn-secondary">🌙 Dark</button>
           </div>
         </div>
         <div class="settings-group">
           <h2>Font Size</h2>
           <div class="font-switcher">
-            <button id="font-small" class="btn btn-secondary btn-sm">A Small</button>
-            <button id="font-medium" class="btn btn-secondary">A Medium</button>
-            <button id="font-large" class="btn btn-secondary btn-lg">A Large</button>
+            <button type="button" id="font-small" class="btn btn-secondary btn-sm">A Small</button>
+            <button type="button" id="font-medium" class="btn btn-secondary">A Medium</button>
+            <button type="button" id="font-large" class="btn btn-secondary btn-lg">A Large</button>
           </div>
         </div>
         <div class="settings-group">
           <h2>Navigation Mode</h2>
           <div class="nav-mode-switcher">
-            <button id="nav-scroll" class="btn btn-secondary">Scroll (Default)</button>
-            <button id="nav-step" class="btn btn-secondary">Step-by-step</button>
+            <button type="button" id="nav-scroll" class="btn btn-secondary">Scroll (Default)</button>
+            <button type="button" id="nav-step" class="btn btn-secondary">Step-by-step</button>
           </div>
         </div>
         <div class="settings-group">
           <h2>Data Management</h2>
           <div class="data-options">
-            <button id="btn-export-data" class="btn btn-secondary">Export Data</button>
-            <button id="btn-import-data" class="btn btn-secondary">Import Data</button>
-            <input type="file" id="import-file" accept="application/json" class="hidden">
-            <button id="btn-clear-cache" class="btn btn-danger">Clear Local Cache</button>
+            <button type="button" id="btn-export-data" class="btn btn-secondary">Export Data</button>
+            <button type="button" id="btn-import-data" class="btn btn-secondary">Import Data</button>
+            <input type="file" id="import-file" accept="application/json" class="hidden" aria-label="Import exam data from JSON file">
+            <button type="button" id="btn-clear-cache" class="btn btn-danger">Clear Local Cache</button>
           </div>
         </div>
         <div class="action-buttons mt-4">
-          <button id="btn-settings-back" class="btn btn-secondary">Back to Main Menu</button>
+          <button type="button" id="btn-settings-back" class="btn btn-secondary">Back to Main Menu</button>
         </div>
       </div>
     </div>
   </div>
+
   <div id="screen-bookmarks" class="screen hidden">
     <div class="container">
       <h1 class="section-title">🔖 Bookmarks</h1>
       <p id="bookmarks-message" class="text-center"></p>
-      <div id="bookmarks-list" class="flex flex-col gap-4 mt-4">
-        </div>
+      <div id="bookmarks-list" class="flex flex-col gap-4 mt-4"></div>
       <div class="action-buttons mt-4">
-        <button id="btn-bookmarks-back" class="btn btn-secondary">Back to Main Menu</button>
+        <button type="button" id="btn-bookmarks-back" class="btn btn-secondary">Back to Main Menu</button>
       </div>
     </div>
   </div>
+
   <div id="screen-analytics" class="screen hidden">
     <div class="container">
       <h1 class="section-title">📊 Analytics</h1>
@@ -143,19 +149,20 @@
         <p id="overall-score"></p>
         <p id="overall-correct"></p>
         <canvas id="overall-chart"></canvas>
-        <div id="section-analytics-list">
-          </div>
+        <div id="section-analytics-list"></div>
       </div>
       <div class="action-buttons">
-        <button id="btn-analytics-back" class="btn btn-secondary">Back to Main Menu</button>
+        <button type="button" id="btn-analytics-back" class="btn btn-secondary">Back to Main Menu</button>
       </div>
     </div>
   </div>
+
   <div id="screen-results" class="screen hidden"></div>
   <div id="screen-review" class="screen hidden"></div>
+
   <div id="image-modal" class="modal-overlay hidden">
     <div class="modal-content">
-      <button id="close-image-modal" class="modal-close">
+      <button type="button" id="close-image-modal" class="modal-close" aria-label="Close image">
         <svg class="icon" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
         </svg>
@@ -163,17 +170,20 @@
       <img id="zoomed-image" src="" alt="Zoomed figure" class="zoomed-image">
     </div>
   </div>
+
   <div id="confirm-modal" class="modal-overlay hidden">
     <div class="modal-content confirm-modal">
       <h2 id="confirm-title"></h2>
       <p id="confirm-message"></p>
       <div class="modal-buttons">
-        <button id="btn-confirm-cancel" class="btn btn-secondary">Cancel</button>
-        <button id="btn-confirm-ok" class="btn btn-primary">OK</button>
+        <button type="button" id="btn-confirm-cancel" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="btn-confirm-ok" class="btn btn-primary">OK</button>
       </div>
     </div>
   </div>
+
   <div id="pdf-container" class="printable-container hidden"></div>
+
   <script src="script.js"></script>
 </body>
 </html>
