@@ -66,8 +66,7 @@ let appState = {
     timerInterval: null,
     examQuestions: [],
     reviewingSection: null,
-    fullQuestionBank: [],
-    isTimerRunning: false
+    fullQuestionBank: []
 };
 
 // ======================
@@ -182,29 +181,92 @@ function showScreen(screenId) {
 }
 
 // ======================
-// CONFIRMATION MODAL
+// BOOKMARKS - FIXED
 // ======================
-function showConfirmModal(title, message, onConfirm) {
-    document.getElementById('confirm-title').textContent = title;
-    document.getElementById('confirm-message').textContent = message;
-    document.getElementById('confirm-modal').classList.remove('hidden');
+function toggleBookmark(section, questionIndex) {
+    const bookmarkId = `${section}-${questionIndex}`;
+    const existingIndex = appState.bookmarks.findIndex(b => b.id === bookmarkId);
+    
+    if (existingIndex > -1) {
+        appState.bookmarks.splice(existingIndex, 1);
+    } else {
+        appState.bookmarks.push({
+            id: bookmarkId,
+            section: section,
+            questionIndex: questionIndex,
+            timestamp: new Date().toISOString()
+        });
+    }
+    saveState();
+    return existingIndex === -1; // true = just bookmarked
+}
 
-    const cancelBtn = document.getElementById('btn-confirm-cancel');
-    const okBtn = document.getElementById('btn-confirm-ok');
+// ======================
+// TIMER & QUESTION LOADING - FIXED
+// ======================
+function loadQuestionsForSection(sectionName) {
+    const savedKey = `examQuestions_${sectionName}`;
+    const savedQuestions = localStorage.getItem(savedKey);
+    let sectionQuestions;
+    
+    if (savedQuestions) {
+        sectionQuestions = JSON.parse(savedQuestions);
+    } else {
+        sectionQuestions = getQuestionsForSection(sectionName);
+        localStorage.setItem(savedKey, JSON.stringify(sectionQuestions));
+    }
+    
+    appState.examQuestions = sectionQuestions;
+    if (!appState.answers[sectionName]) {
+        appState.answers[sectionName] = new Array(sectionQuestions.length).fill(null);
+    }
+    
+    // ✅ FIX: Always reset timer to full section time
+    appState.timeLeft = SECTIONS[sectionName].time;
+    if (document.getElementById('exam-timer')) {
+        document.getElementById('exam-timer').textContent = formatTime(appState.timeLeft);
+    }
+    
+    startTimer();
+}
 
-    const handleCancel = () => {
-        document.getElementById('confirm-modal').classList.add('hidden');
-        cancelBtn.removeEventListener('click', handleCancel);
-        okBtn.removeEventListener('click', handleConfirm);
-    };
+function startTimer() {
+    clearInterval(appState.timerInterval);
+    appState.timerInterval = setInterval(() => {
+        appState.timeLeft--;
+        if (document.getElementById('exam-timer')) {
+            document.getElementById('exam-timer').textContent = formatTime(appState.timeLeft);
+        }
+        if (appState.timeLeft <= 0) {
+            clearInterval(appState.timerInterval);
+            submitExam();
+        }
+    }, 1000);
+}
 
-    const handleConfirm = () => {
-        onConfirm();
-        handleCancel();
-    };
-
-    cancelBtn.addEventListener('click', handleCancel);
-    okBtn.addEventListener('click', handleConfirm);
+// ======================
+// RESET - Now also clears saved questions
+// ======================
+function resetExam() {
+    if (!confirm('Are you sure you want to reset all exam data? This cannot be undone.')) return;
+    
+    clearInterval(appState.timerInterval);
+    appState.answers = {};
+    appState.results = {};
+    appState.bookmarks = [];
+    appState.timeLeft = 0;
+    appState.currentSection = null;
+    
+    localStorage.removeItem('examAnswers');
+    localStorage.removeItem('examResults');
+    localStorage.removeItem('examBookmarks');
+    
+    // ✅ CRITICAL: Also clear saved questions so new exam = fresh shuffle
+    Object.keys(SECTIONS).forEach(sectionName => {
+        localStorage.removeItem(`examQuestions_${sectionName}`);
+    });
+    
+    showScreen('main-menu');
 }
 
 // ======================
@@ -289,71 +351,39 @@ function renderInstructions() {
 }
 
 // ======================
-// EXAM SCREEN
+// EXAM SCREEN - FIXED BOOKMARK UI
 // ======================
-function loadQuestionsForSection(sectionName) {
-    const savedKey = `examQuestions_${sectionName}`;
-    const savedQuestions = localStorage.getItem(savedKey);
-    let sectionQuestions;
-    if (savedQuestions) {
-        sectionQuestions = JSON.parse(savedQuestions);
-    } else {
-        sectionQuestions = getQuestionsForSection(sectionName);
-        localStorage.setItem(savedKey, JSON.stringify(sectionQuestions));
-    }
-    appState.examQuestions = sectionQuestions;
-    if (!appState.answers[sectionName]) {
-        appState.answers[sectionName] = new Array(sectionQuestions.length).fill(null);
-    }
-    // Restore time if previously paused
-    if (appState.timeLeft <= 0 || appState.timeLeft >= SECTIONS[sectionName].time) {
-        appState.timeLeft = SECTIONS[sectionName].time;
-    }
-    startTimer();
-}
-
-function startTimer() {
-    clearInterval(appState.timerInterval);
-    appState.isTimerRunning = true;
-    appState.timerInterval = setInterval(() => {
-        appState.timeLeft--;
-        document.getElementById('exam-timer').textContent = formatTime(appState.timeLeft);
-        if (appState.timeLeft <= 0) {
-            clearInterval(appState.timerInterval);
-            appState.isTimerRunning = false;
-            submitExam();
-        }
-    }, 1000);
-}
-
-function pauseTimer() {
-    clearInterval(appState.timerInterval);
-    appState.isTimerRunning = false;
-}
-
 function renderExam() {
     const section = SECTIONS[appState.currentSection];
     const totalQuestions = appState.examQuestions.length;
+    
     document.getElementById('exam-section-title').textContent = section.title;
     document.getElementById('exam-progress').textContent = `Question 1 of ${totalQuestions}`;
+    
     const container = document.getElementById('exam-questions-container');
     container.innerHTML = '';
+    
     appState.examQuestions.forEach((question, index) => {
         const userAnswer = appState.answers[appState.currentSection][index];
         const isBookmarked = appState.bookmarks.some(b => 
             b.section === appState.currentSection && b.questionIndex === index
         );
+        
         const questionCard = document.createElement('div');
         questionCard.className = 'question-card';
         questionCard.id = `question-${index}`;
+        
+        const bookmarkIcon = isBookmarked ? '🔖' : '📖';
+        const bookmarkClass = isBookmarked ? 'btn-primary' : 'btn-secondary';
+        
         questionCard.innerHTML = `
             <div class="question-header">
                 <div>
                     <p class="question-number">Question ${index + 1}</p>
                     ${question.group_id ? `<p class="question-group">Situation: ${question.group_id}</p>` : ''}
                 </div>
-                <button class="btn ${isBookmarked ? 'btn-primary' : 'btn-secondary'} btn-sm" data-bookmark="${index}">
-                    📖
+                <button class="btn ${bookmarkClass} btn-sm" data-bookmark="${index}">
+                    ${bookmarkIcon}
                 </button>
             </div>
             <p class="question-stem whitespace-pre-wrap">${question.stem}</p>
@@ -378,14 +408,15 @@ function renderExam() {
         container.appendChild(questionCard);
     });
 
+    // ✅ Fixed bookmark event listener
     document.querySelectorAll('[data-bookmark]').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const index = parseInt(e.target.dataset.bookmark);
-            toggleBookmark(appState.currentSection, index);
-            const isBookmarked = appState.bookmarks.some(b => 
-                b.section === appState.currentSection && b.questionIndex === index
-            );
-            e.target.className = `btn ${isBookmarked ? 'btn-primary' : 'btn-secondary'} btn-sm`;
+            const button = e.currentTarget;
+            const index = parseInt(button.dataset.bookmark);
+            const isNowBookmarked = toggleBookmark(appState.currentSection, index);
+            
+            button.className = `btn ${isNowBookmarked ? 'btn-primary' : 'btn-secondary'} btn-sm`;
+            button.innerHTML = isNowBookmarked ? '🔖' : '📖';
         });
     });
 
@@ -411,11 +442,10 @@ function renderExam() {
     });
 
     document.getElementById('btn-pause-resume').onclick = () => {
-        pauseTimer();
+        clearInterval(appState.timerInterval);
         showScreen('main-menu');
     };
 
-    // NEW: Confirm before submitting
     document.getElementById('btn-submit-exam').onclick = () => {
         showConfirmModal(
             "Confirm Submission",
@@ -432,7 +462,7 @@ function selectAnswer(questionIndex, choice) {
 }
 
 function submitExam() {
-    pauseTimer();
+    clearInterval(appState.timerInterval);
     const sectionName = appState.currentSection;
     const questions = appState.examQuestions;
     const answers = appState.answers[sectionName];
@@ -466,7 +496,33 @@ function submitExam() {
 }
 
 // ======================
-// RESULTS SCREEN (unchanged logic, just included for completeness)
+// CONFIRMATION MODAL
+// ======================
+function showConfirmModal(title, message, onConfirm) {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-message').textContent = message;
+    document.getElementById('confirm-modal').classList.remove('hidden');
+
+    const cancelBtn = document.getElementById('btn-confirm-cancel');
+    const okBtn = document.getElementById('btn-confirm-ok');
+
+    const handleCancel = () => {
+        document.getElementById('confirm-modal').classList.add('hidden');
+        cancelBtn.removeEventListener('click', handleCancel);
+        okBtn.removeEventListener('click', handleConfirm);
+    };
+
+    const handleConfirm = () => {
+        onConfirm();
+        handleCancel();
+    };
+
+    cancelBtn.addEventListener('click', handleCancel);
+    okBtn.addEventListener('click', handleConfirm);
+}
+
+// ======================
+// RESULTS SCREEN (unchanged)
 // ======================
 function showResultsScreen(sectionName) {
     const result = appState.results[sectionName];
@@ -652,26 +708,7 @@ function showReviewScreen(sectionName) {
 }
 
 // ======================
-// BOOKMARKS
-// ======================
-function toggleBookmark(section, index) {
-    const id = `${section}-${index}`;
-    const exists = appState.bookmarks.some(b => b.id === id);
-    if (exists) {
-        appState.bookmarks = appState.bookmarks.filter(b => b.id !== id);
-    } else {
-        appState.bookmarks.push({
-            id,
-            section,
-            questionIndex: index,
-            timestamp: new Date().toISOString()
-        });
-    }
-    saveState();
-}
-
-// ======================
-// OTHER SCREENS
+// OTHER SCREENS (unchanged)
 // ======================
 function showSettingsScreen() {
     const screen = document.createElement('div');
@@ -836,106 +873,77 @@ function showAnalyticsScreen() {
 // OFFLINE PDF GENERATION
 // ======================
 async function generateOfflinePDF() {
-    showConfirmModal(
-        "Download for Offline",
-        "This will generate a PDF containing all exam sections (instructions + questions). It may take a few seconds. Continue?",
-        async () => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
+    if (!confirm('Generate a PDF of all exam sections (instructions + questions)? This may take a few seconds.')) return;
 
-            // Add title
-            doc.setFontSize(20);
-            doc.text("Civil Engineering Exam - Offline Copy", 14, 20);
-            doc.setFontSize(12);
-            doc.text("Generated on: " + new Date().toLocaleString(), 14, 30);
-            let y = 40;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
 
-            // Process each section
-            for (const sectionKey in SECTIONS) {
-                const section = SECTIONS[sectionKey];
-                const questions = getQuestionsForSection(sectionKey);
+    doc.setFontSize(20);
+    doc.text("Civil Engineering Exam - Offline Copy", 14, 20);
+    doc.setFontSize(12);
+    doc.text("Generated on: " + new Date().toLocaleString(), 14, 30);
+    let y = 40;
 
-                // Section header
-                doc.setFontSize(16);
-                doc.text(`${section.title} (${sectionKey})`, 14, y);
-                y += 10;
-                doc.setFontSize(12);
-                doc.text(`Total Questions: ${questions.length}`, 14, y);
-                y += 10;
+    if (appState.fullQuestionBank.length === 0) {
+        appState.fullQuestionBank = getFallbackQuestions();
+    }
 
-                // Instructions
-                doc.setFontStyle('bold');
-                doc.text("Instructions:", 14, y);
-                doc.setFontStyle('normal');
-                y += 5;
-                PRC_INSTRUCTIONS.forEach(instr => {
-                    doc.text(`• ${instr}`, 18, y);
-                    y += 6;
-                    if (y > 280) {
-                        doc.addPage();
-                        y = 20;
-                    }
-                });
-                y += 10;
+    for (const [key, section] of Object.entries(SECTIONS)) {
+        const questions = getQuestionsForSection(key);
 
-                // Questions
-                doc.setFontStyle('bold');
-                doc.text("Questions:", 14, y);
-                doc.setFontStyle('normal');
-                y += 8;
+        doc.setFontSize(16);
+        doc.text(`${section.title} (${key})`, 14, y);
+        y += 10;
+        doc.setFontSize(12);
+        doc.text(`Total Questions: ${questions.length}`, 14, y);
+        y += 10;
 
-                for (let i = 0; i < questions.length; i++) {
-                    const q = questions[i];
-                    const stem = `Q${i+1}. ${q.stem}`;
-                    const lines = doc.splitTextToSize(stem, 180);
-                    lines.forEach(line => {
-                        if (y > 280) {
-                            doc.addPage();
-                            y = 20;
-                        }
-                        doc.text(line, 14, y);
-                        y += 6;
-                    });
-                    q.choices.forEach((choice, idx) => {
-                        const letter = String.fromCharCode(65 + idx);
-                        doc.text(`${letter}. ${choice}`, 20, y);
-                        y += 6;
-                        if (y > 280) {
-                            doc.addPage();
-                            y = 20;
-                        }
-                    });
-                    y += 8;
-                }
+        doc.setFont("helvetica", "bold");
+        doc.text("Instructions:", 14, y);
+        doc.setFont("helvetica", "normal");
+        y += 6;
+        PRC_INSTRUCTIONS.forEach(instr => {
+            doc.text(`• ${instr}`, 18, y);
+            y += 6;
+            if (y > 280) { doc.addPage(); y = 20; }
+        });
+        y += 8;
 
-                if (sectionKey !== Object.keys(SECTIONS)[Object.keys(SECTIONS).length - 1]) {
-                    doc.addPage();
-                    y = 20;
-                }
-            }
+        doc.setFont("helvetica", "bold");
+        doc.text("Questions:", 14, y);
+        doc.setFont("helvetica", "normal");
+        y += 8;
 
-            doc.save('Civil_Engineering_Exam_Offline.pdf');
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            const stem = `Q${i+1}. ${q.stem}`;
+            const lines = doc.splitTextToSize(stem, 180);
+            lines.forEach(line => {
+                if (y > 280) { doc.addPage(); y = 20; }
+                doc.text(line, 14, y);
+                y += 6;
+            });
+            q.choices.forEach((choice, idx) => {
+                const letter = String.fromCharCode(65 + idx);
+                doc.text(`${letter}. ${choice}`, 20, y);
+                y += 6;
+                if (y > 280) { doc.addPage(); y = 20; }
+            });
+            y += 8;
         }
-    );
+
+        if (key !== 'PSAD') {
+            doc.addPage();
+            y = 20;
+        }
+    }
+
+    doc.save('Civil_Engineering_Exam_Offline.pdf');
 }
 
 // ======================
 // RESET & FULL MOCK EXAM
 // ======================
-function resetExam() {
-    if (!confirm('Are you sure you want to reset all exam data? This cannot be undone.')) return;
-    appState.answers = {};
-    appState.results = {};
-    appState.bookmarks = [];
-    localStorage.removeItem('examAnswers');
-    localStorage.removeItem('examResults');
-    localStorage.removeItem('examBookmarks');
-    Object.keys(SECTIONS).forEach(sectionName => {
-        localStorage.removeItem(`examQuestions_${sectionName}`);
-    });
-    showScreen('main-menu');
-}
-
 function startFullMockExam() {
     resetExam();
     appState.currentSection = 'AMSTHEC';
@@ -943,15 +951,16 @@ function startFullMockExam() {
 }
 
 // ======================
-// FALLBACK QUESTIONS (same as before – omitted for brevity but required)
+// FALLBACK QUESTIONS (unchanged)
 // ======================
-// [Include all your getFallbackQuestions() and helper functions here unchanged]
+// [All get*Question, get*Choices, get*Answer, getFallbackQuestions functions remain exactly as in your original code]
+// For brevity, they are not repeated here, but must be included.
 
-// For brevity in this response, we assume they are present.
-// In your real file, keep all get*Question, get*Choices, get*Answer, and getFallbackQuestions functions.
+// Include all your original fallback question generator functions here...
 
 function getFallbackQuestions() { /* ... */ }
-// ... (all helper functions)
+function getAlgebraEquation(group, question) { /* ... */ }
+// ... (all other helper functions)
 
 function getSampleQuestions(sectionName) {
     return getFallbackQuestions().filter(q => q.section === sectionName);
@@ -973,7 +982,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => showScreen('main-menu'), 1000);
     }
 
-    // Modal close
     document.getElementById('close-image-modal').onclick = () => {
         document.getElementById('image-modal').classList.add('hidden');
     };
