@@ -991,3 +991,121 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 });
+
+// ======================
+// PDF GENERATION FUNCTIONS
+// ======================
+
+// Full exam PDF (all sections)
+async function generateOfflinePDF() {
+    if (!confirm('Generate a PDF of ALL exam sections?')) return;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(20);
+    doc.text("Civil Engineering Exam - Offline Copy", 14, 20);
+    doc.setFontSize(12);
+    doc.text("Generated on: " + new Date().toLocaleString(), 14, 30);
+    let y = 40;
+
+    if (appState.fullQuestionBank.length === 0) {
+        appState.fullQuestionBank = getFallbackQuestions();
+    }
+
+    for (const [key, section] of Object.entries(SECTIONS)) {
+        const questions = getQuestionsForSection(key);
+
+        doc.setFontSize(16);
+        doc.text(`${section.title} (${key})`, 14, y);
+        y += 10;
+        doc.setFontSize(12);
+        doc.text(`Total Questions: ${questions.length}`, 14, y);
+        y += 10;
+
+        doc.setFont("helvetica", "bold");
+        doc.text("Instructions:", 14, y);
+        doc.setFont("helvetica", "normal");
+        y += 6;
+        PRC_INSTRUCTIONS.forEach(instr => {
+            doc.text(`• ${instr}`, 18, y);
+            y += 6;
+            if (y > 280) { doc.addPage(); y = 20; }
+        });
+        y += 8;
+
+        doc.setFont("helvetica", "bold");
+        doc.text("Questions:", 14, y);
+        doc.setFont("helvetica", "normal");
+        y += 8;
+
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            const stem = `Q${i+1}. ${q.stem}`;
+            const lines = doc.splitTextToSize(stem, 180);
+            lines.forEach(line => {
+                if (y > 280) { doc.addPage(); y = 20; }
+                doc.text(line, 14, y);
+                y += 6;
+            });
+            q.choices.forEach((choice, idx) => {
+                const letter = String.fromCharCode(65 + idx);
+                doc.text(`${letter}. ${choice}`, 20, y);
+                y += 6;
+                if (y > 280) { doc.addPage(); y = 20; }
+            });
+            y += 8;
+        }
+
+        if (key !== 'PSAD') {
+            doc.addPage();
+            y = 20;
+        }
+    }
+
+    doc.save('Civil_Engineering_Exam_All.pdf');
+}
+
+// Section-only PDF (current section)
+async function generateSectionPDF(sectionKey) {
+    const section = SECTIONS[sectionKey];
+    if (!section) return;
+    if (!confirm(`Generate PDF for section ${section.title}?`)) return;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(20);
+    doc.text(`${section.title} (${sectionKey})`, 14, 20);
+    doc.setFontSize(12);
+    doc.text("Generated on: " + new Date().toLocaleString(), 14, 30);
+    let y = 40;
+
+    const questions = getQuestionsForSection(sectionKey);
+    questions.forEach((q, i) => {
+        const stem = `Q${i+1}. ${q.stem}`;
+        const lines = doc.splitTextToSize(stem, 180);
+        lines.forEach(line => {
+            if (y > 280) { doc.addPage(); y = 20; }
+            doc.text(line, 14, y);
+            y += 6;
+        });
+        q.choices.forEach((choice, idx) => {
+            const letter = String.fromCharCode(65 + idx);
+            doc.text(`${letter}. ${choice}`, 20, y);
+            y += 6;
+            if (y > 280) { doc.addPage(); y = 20; }
+        });
+        y += 8;
+    });
+
+    doc.save(`Exam_${sectionKey}.pdf`);
+    document.getElementById('btn-download-section').addEventListener('click', () => {
+    if (appState.currentSection) {
+        generateSectionPDF(appState.currentSection);
+    } else {
+        alert('Open a section first.');
+    }
+});
+
+}
