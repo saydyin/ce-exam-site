@@ -66,7 +66,9 @@ let appState = {
     timerInterval: null,
     examQuestions: [],
     reviewingSection: null,
-    fullQuestionBank: []
+    fullQuestionBank: [],
+    isPaused: false, // 🔹 Added for pause/resume
+    firstWrongIndex: null // 🔹 Added for scroll to first wrong
 };
 
 // ======================
@@ -112,7 +114,6 @@ function processQuestionsWithGroups(questions) {
             groupMap[tempId] = [question];
         }
     });
-
     const validGroups = [];
     const standaloneQuestions = [];
     Object.entries(groupMap).forEach(([gid, group]) => {
@@ -131,10 +132,8 @@ function processQuestionsWithGroups(questions) {
             standaloneQuestions.push(...group);
         }
     });
-
     const shuffledGroups = shuffleArray(validGroups);
     const shuffledSingles = shuffleArray(standaloneQuestions);
-
     let result = [];
     let singleIndex = 0;
     if (shuffledGroups.length > 0) {
@@ -151,7 +150,6 @@ function processQuestionsWithGroups(questions) {
     } else {
         result = shuffledSingles;
     }
-
     const checkLastN = 5;
     const tail = result.slice(-checkLastN);
     const badIndex = tail.findIndex(q => q.stem.trim().startsWith('Situation'));
@@ -166,7 +164,6 @@ function processQuestionsWithGroups(questions) {
             result = remaining;
         }
     }
-
     const groupSizeMap = {};
     result.forEach(q => {
         const gid = q.group_id;
@@ -271,7 +268,9 @@ function loadQuestionsForSection(sectionName) {
     if (document.getElementById('exam-timer')) {
         document.getElementById('exam-timer').textContent = formatTime(appState.timeLeft);
     }
-    startTimer();
+    if (!appState.isPaused) {
+        startTimer();
+    }
 }
 
 function startTimer() {
@@ -299,6 +298,8 @@ function resetExam() {
     appState.bookmarks = [];
     appState.timeLeft = 0;
     appState.currentSection = null;
+    appState.isPaused = false;
+    appState.firstWrongIndex = null;
     localStorage.removeItem('examAnswers');
     localStorage.removeItem('examResults');
     localStorage.removeItem('examBookmarks');
@@ -309,7 +310,7 @@ function resetExam() {
 }
 
 // ======================
-// MAIN MENU
+// MAIN MENU – FIXED FOR PAUSE/RESUME
 // ======================
 function renderMainMenu() {
     const completedCount = Object.keys(appState.results).length;
@@ -318,9 +319,13 @@ function renderMainMenu() {
     grid.innerHTML = '';
     Object.values(SECTIONS).forEach((section, idx) => {
         const isCompleted = appState.results[section.name] !== undefined;
+        const isPaused = appState.isPaused && appState.currentSection === section.name;
         const score = isCompleted ? appState.results[section.name].score_pct : null;
         const card = document.createElement('div');
         card.className = 'section-card';
+        let buttonText = isCompleted ? 'Review Section' : (isPaused ? 'Continue Section' : 'Start Section');
+        let buttonClass = isCompleted ? 'btn-secondary' : 'btn-primary';
+
         card.innerHTML = `
             <div class="section-card-header">
                 <h2 class="section-card-title">
@@ -330,8 +335,8 @@ function renderMainMenu() {
                 ${isCompleted ? `<span class="section-card-score">${score.toFixed(1)}%</span>` : ''}
             </div>
             <p class="section-card-description">${section.title}</p>
-            <button class="btn ${isCompleted ? 'btn-secondary' : 'btn-primary'}" data-action="${isCompleted ? 'review' : 'start'}" data-section="${section.name}">
-                ${isCompleted ? 'Review Section' : 'Start Section'}
+            <button class="btn ${buttonClass}" data-action="${isCompleted ? 'review' : (isPaused ? 'continue' : 'start')}" data-section="${section.name}">
+                ${buttonText}
             </button>
             ${isCompleted ? `
                 <div class="progress-container">
@@ -339,16 +344,31 @@ function renderMainMenu() {
                 </div>
             ` : ''}
         `;
+
+        // 🔹 Show remaining time if paused
+        if (isPaused) {
+            const timeDisplay = formatTime(appState.timeLeft);
+            const timerEl = document.createElement('p');
+            timerEl.className = 'paused-timer';
+            timerEl.textContent = `⏸ Time left: ${timeDisplay}`;
+            timerEl.style.fontSize = '0.875rem';
+            timerEl.style.color = 'var(--text-muted-light)';
+            card.appendChild(timerEl);
+        }
+
         grid.appendChild(card);
     });
 
-    document.querySelectorAll('[data-action="start"]').forEach(btn => {
+    // Start or Continue Section
+    document.querySelectorAll('[data-action="start"], [data-action="continue"]').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const sectionName = e.target.dataset.section;
             appState.currentSection = sectionName;
             showScreen('instructions');
         });
     });
+
+    // Review Section
     document.querySelectorAll('[data-action="review"]').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const sectionName = e.target.dataset.section;
@@ -365,7 +385,7 @@ function renderMainMenu() {
 }
 
 // ======================
-// INSTRUCTIONS SCREEN
+// INSTRUCTIONS SCREEN – FIXED
 // ======================
 function renderInstructions() {
     const section = SECTIONS[appState.currentSection];
@@ -384,13 +404,17 @@ function renderInstructions() {
     document.getElementById('motivational-quote').textContent = `"${quote}"`;
     document.getElementById('btn-instructions-back').onclick = () => showScreen('main-menu');
     document.getElementById('btn-start-exam').onclick = () => {
-        loadQuestionsForSection(appState.currentSection);
+        if (!appState.isPaused) {
+            loadQuestionsForSection(appState.currentSection);
+        }
+        appState.isPaused = false;
         showScreen('exam');
+        startTimer();
     };
 }
 
 // ======================
-// EXAM SCREEN
+// EXAM SCREEN – FIXED
 // ======================
 function renderExam() {
     const section = SECTIONS[appState.currentSection];
@@ -440,7 +464,6 @@ function renderExam() {
         `;
         container.appendChild(questionCard);
     });
-
     document.querySelectorAll('[data-bookmark]').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const button = e.currentTarget;
@@ -450,7 +473,6 @@ function renderExam() {
             button.innerHTML = isNowBookmarked ? '🔖' : '📖';
         });
     });
-
     document.querySelectorAll('.choice-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const btnEl = e.target.closest('.choice-btn');
@@ -462,7 +484,6 @@ function renderExam() {
                 choiceBtn.classList.remove('selected');
             });
             btnEl.classList.add('selected');
-
             const nextIndex = questionIndex + 1;
             const nextEl = document.getElementById(`question-${nextIndex}`);
             if (nextEl) {
@@ -477,16 +498,16 @@ function renderExam() {
             }
         });
     });
-
     document.querySelectorAll('img[data-figure]').forEach(img => {
         img.addEventListener('click', () => {
             document.getElementById('zoomed-image').src = img.src;
             document.getElementById('image-modal').classList.remove('hidden');
         });
     });
-
     document.getElementById('btn-pause-resume').onclick = () => {
         clearInterval(appState.timerInterval);
+        appState.isPaused = true;
+        saveState();
         showScreen('main-menu');
     };
     document.getElementById('btn-submit-exam').onclick = () => {
@@ -504,6 +525,9 @@ function selectAnswer(questionIndex, choice) {
     saveState();
 }
 
+// ======================
+// SUBMIT EXAM – FIXED
+// ======================
 function submitExam() {
     clearInterval(appState.timerInterval);
     const sectionName = appState.currentSection;
@@ -527,6 +551,14 @@ function submitExam() {
             });
         }
     });
+
+    // 🔹 Track first wrong question index
+    if (wrongAnswers.length > 0) {
+        appState.firstWrongIndex = wrongAnswers[0].number - 1;
+    } else {
+        appState.firstWrongIndex = null;
+    }
+
     const score_pct = (correctCount / questions.length) * 100;
     appState.results[sectionName] = {
         score_pct,
@@ -534,6 +566,7 @@ function submitExam() {
         total: questions.length,
         wrong: wrongAnswers
     };
+    appState.isPaused = false;
     saveState();
     showResultsScreen(sectionName);
 }
@@ -561,13 +594,12 @@ function showConfirmModal(title, message, onConfirm) {
 }
 
 // ======================
-// RESULTS SCREEN – FIXED (uses pre-existing container)
+// RESULTS SCREEN – FIXED
 // ======================
 function showResultsScreen(sectionName) {
     const result = appState.results[sectionName];
     const passed = result.score_pct >= 70;
     const screen = document.getElementById('screen-results');
-
     let wrongAnswersHTML = '';
     if (result.wrong.length > 0) {
         result.wrong.forEach(wrong => {
@@ -612,7 +644,6 @@ function showResultsScreen(sectionName) {
             `;
         });
     }
-
     screen.innerHTML = `
         <div class="container">
             <div class="results-header">
@@ -636,8 +667,10 @@ function showResultsScreen(sectionName) {
             <button id="btn-back-to-main" class="btn btn-secondary">Back to Main Menu</button>
         </div>
     `;
-
     showScreen('results');
+
+    // 🔹 Always scroll to top of results
+    window.scrollTo({ top: 0, behavior: 'auto' });
 
     document.querySelectorAll('#wrong-answers-list img[data-figure]').forEach(img => {
         img.addEventListener('click', () => {
@@ -645,7 +678,6 @@ function showResultsScreen(sectionName) {
             document.getElementById('image-modal').classList.remove('hidden');
         });
     });
-
     document.getElementById('btn-review-all').onclick = () => showReviewScreen(sectionName);
     document.getElementById('btn-continue').onclick = () => showScreen('main-menu');
     document.getElementById('btn-back-to-main').onclick = () => showScreen('main-menu');
@@ -659,7 +691,6 @@ function showReviewScreen(sectionName) {
     const savedQuestions = localStorage.getItem(savedKey);
     let questions = savedQuestions ? JSON.parse(savedQuestions) : getQuestionsForSection(sectionName);
     const answers = appState.answers[sectionName] || [];
-
     const screen = document.getElementById('screen-review');
     let content = `
         <div class="container">
@@ -677,7 +708,6 @@ function showReviewScreen(sectionName) {
     `;
     screen.innerHTML = content;
     showScreen('review');
-
     const list = document.getElementById('review-questions-list');
     questions.forEach((question, index) => {
         const userAnswer = answers[index];
@@ -699,6 +729,7 @@ function showReviewScreen(sectionName) {
         });
         const card = document.createElement('div');
         card.className = 'question-card';
+        card.id = `question-${index}`;
         card.innerHTML = `
             <div class="question-header">
                 <p class="question-number">Question ${index + 1}</p>
@@ -724,7 +755,6 @@ function showReviewScreen(sectionName) {
         `;
         list.appendChild(card);
     });
-
     list.querySelectorAll('img[data-figure]').forEach(img => {
         img.addEventListener('click', () => {
             document.getElementById('zoomed-image').src = img.src;
@@ -732,19 +762,26 @@ function showReviewScreen(sectionName) {
         });
     });
 
+    // 🔹 Scroll to first wrong question if available
+    if (appState.firstWrongIndex !== null) {
+        const firstWrongEl = document.getElementById(`question-${appState.firstWrongIndex}`);
+        if (firstWrongEl) {
+            firstWrongEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
     document.getElementById('btn-review-back').onclick = () => {
         showScreen('main-menu');
     };
 }
 
 // ======================
-// SETTINGS SCREEN – FIXED
+// SETTINGS SCREEN
 // ======================
 function showSettingsScreen() {
     showScreen('settings');
     document.getElementById('setting-theme').value = appState.settings.theme;
     document.getElementById('setting-font').value = appState.settings.fontSize;
-
     const handleThemeChange = (e) => {
         appState.settings.theme = e.target.value;
         document.documentElement.classList.toggle('dark', appState.settings.theme === 'dark');
@@ -754,24 +791,21 @@ function showSettingsScreen() {
         appState.settings.fontSize = e.target.value;
         saveState();
     };
-
     const themeSelect = document.getElementById('setting-theme');
     const fontSelect = document.getElementById('setting-font');
     themeSelect.onchange = handleThemeChange;
     fontSelect.onchange = handleFontChange;
-
     document.getElementById('btn-settings-back').onclick = () => {
         showScreen('main-menu');
     };
 }
 
 // ======================
-// BOOKMARKS SCREEN – FIXED
+// BOOKMARKS SCREEN
 // ======================
 function showBookmarksScreen() {
     const bookmarksContainer = document.getElementById('bookmarks-content');
     const clearBtn = document.getElementById('btn-clear-bookmarks');
-
     if (appState.bookmarks.length === 0) {
         bookmarksContainer.innerHTML = `<p class="text-center">No bookmarks yet.</p>`;
         clearBtn.classList.add('hidden');
@@ -790,7 +824,6 @@ function showBookmarksScreen() {
         content += '</div>';
         bookmarksContainer.innerHTML = content;
         clearBtn.classList.remove('hidden');
-
         document.querySelectorAll('[data-go]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const [section, index] = e.target.dataset.go.split('-');
@@ -803,7 +836,6 @@ function showBookmarksScreen() {
                 }, 100);
             });
         });
-
         clearBtn.onclick = () => {
             if (confirm('Clear all bookmarks?')) {
                 appState.bookmarks = [];
@@ -812,7 +844,6 @@ function showBookmarksScreen() {
             }
         };
     }
-
     showScreen('bookmarks');
     document.getElementById('btn-bookmarks-back').onclick = () => {
         showScreen('main-menu');
@@ -820,11 +851,10 @@ function showBookmarksScreen() {
 }
 
 // ======================
-// ANALYTICS SCREEN – FIXED
+// ANALYTICS SCREEN
 // ======================
 function showAnalyticsScreen() {
     const analyticsContent = document.getElementById('analytics-content');
-
     if (Object.keys(appState.results).length === 0) {
         analyticsContent.innerHTML = `
             <div class="card text-center">
@@ -857,7 +887,6 @@ function showAnalyticsScreen() {
         });
         content += '</div>';
         analyticsContent.innerHTML = content;
-
         document.querySelectorAll('[data-review]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const sectionName = e.target.dataset.review;
@@ -865,7 +894,6 @@ function showAnalyticsScreen() {
             });
         });
     }
-
     showScreen('analytics');
     document.getElementById('btn-analytics-back').onclick = () => {
         showScreen('main-menu');
@@ -873,99 +901,96 @@ function showAnalyticsScreen() {
 }
 
 // ======================
-// PDF GENERATION
+// NEW: QUESTIONS-ONLY & FIGURES-ONLY RENDERERS
+// ======================
+function renderQuestionsOnly(questions, container) {
+    container.innerHTML = '';
+    let currentGroup = null;
+    questions.forEach((q, idx) => {
+        if (q.group_id && q.group_id !== currentGroup) {
+            currentGroup = q.group_id;
+            const situationHeader = document.createElement('div');
+            situationHeader.className = 'situation-header';
+            situationHeader.textContent = `Situation ${currentGroup}`;
+            container.appendChild(situationHeader);
+        }
+        const card = document.createElement('div');
+        card.className = 'question-card';
+        card.innerHTML = `
+            <p class="question-number">Question ${idx + 1}</p>
+            <p class="question-stem">${q.stem}</p>
+            <div class="choices-container">
+                ${q.choices.map((c, i) => `
+                    <div class="choice-line">
+                        <strong>${String.fromCharCode(65 + i)}.</strong> ${c}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function renderFiguresOnly(questions, container) {
+    container.innerHTML = '';
+    questions.forEach((q, idx) => {
+        if (q.figure) {
+            const figCard = document.createElement('div');
+            figCard.className = 'figure-card';
+            figCard.innerHTML = `
+                <p class="figure-label">Figure for Question ${idx + 1}</p>
+                <img src="${q.figure}" alt="Figure for Question ${idx + 1}">
+            `;
+            container.appendChild(figCard);
+        }
+    });
+}
+
+// ======================
+// PDF GENERATION – PROFESSIONAL TWO-SECTION
 // ======================
 async function generateOfflinePDF() {
-    if (!confirm('Generate optimized Legal-size PDF with answer sheet and grouped figures?')) return;
+    if (!confirm('Generate optimized Legal-size PDF with Questions + Figures?')) return;
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({
         orientation: 'p',
         unit: 'pt',
         format: [612, 936] // Legal: 8.5" x 13"
     });
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(12);
 
-    // Page 1: Answer Sheet
-    try {
-        const img = new Image();
-        img.src = 'Practice Answer Sheet.jpg';
-        await img.decode();
-        doc.addImage(img, 'JPEG', 40, 40, 532, 856);
-    } catch {
-        doc.text('ANSWER SHEET (image missing)', 72, 72);
-    }
-    doc.addPage();
-
-    const figureGroups = {};
-    const noFigure = [];
+    // Get all questions
     const allQuestions = appState.fullQuestionBank.length ? appState.fullQuestionBank : getFallbackQuestions();
-    allQuestions.forEach(q => {
-        if (q.figure) {
-            if (!figureGroups[q.figure]) figureGroups[q.figure] = [];
-            figureGroups[q.figure].push(q);
-        } else {
-            noFigure.push(q);
-        }
+
+    // Render questions
+    const questionsContainer = document.getElementById('printable-questions');
+    renderQuestionsOnly(allQuestions, questionsContainer);
+
+    // Add questions to PDF
+    await doc.html(questionsContainer, {
+        callback: function (doc) {
+            // Render figures
+            const figuresContainer = document.getElementById('printable-figures');
+            renderFiguresOnly(allQuestions, figuresContainer);
+            if (figuresContainer.children.length > 0) {
+                doc.addPage();
+                doc.html(figuresContainer, {
+                    callback: function (doc) {
+                        doc.save('Civil_Engineering_Exam.pdf');
+                    },
+                    x: 40,
+                    y: 40,
+                    width: 532,
+                    windowWidth: 800
+                });
+            } else {
+                doc.save('Civil_Engineering_Exam.pdf');
+            }
+        },
+        x: 40,
+        y: 40,
+        width: 532,
+        windowWidth: 800
     });
-
-    function drawChoices(choices, x, y, maxWidth) {
-        const labels = ['A.', 'B.', 'C.', 'D.'];
-        const texts = labels.map((l, i) => `${l} ${choices[i]}`);
-        const widths = texts.map(t => doc.getTextWidth(t));
-        const maxChoiceWidth = Math.max(...widths);
-        if (maxChoiceWidth * 2 + 20 <= maxWidth) {
-            doc.text(texts[0], x, y);
-            doc.text(texts[2], x + maxWidth / 2, y);
-            doc.text(texts[1], x, y + 18);
-            doc.text(texts[3], x + maxWidth / 2, y + 18);
-            return y + 36;
-        } else {
-            texts.forEach((t, i) => {
-                doc.text(t, x, y + i * 18);
-            });
-            return y + texts.length * 18;
-        }
-    }
-
-    function addQuestion(q, y) {
-        const maxWidth = 468;
-        const lines = doc.splitTextToSize(q.stem, maxWidth);
-        lines.forEach(line => {
-            if (y > 880) { doc.addPage(); y = 72; }
-            doc.text(line, 72, y);
-            y += 16;
-        });
-        y = drawChoices(q.choices, 72, y, maxWidth) + 10;
-        return y;
-    }
-
-    let y = 72;
-    noFigure.forEach(q => {
-        if (y > 880) { doc.addPage(); y = 72; }
-        y = addQuestion(q, y);
-    });
-
-    for (const [fig, qs] of Object.entries(figureGroups)) {
-        doc.addPage();
-        y = 72;
-        try {
-            const img = new Image();
-            img.src = fig;
-            await img.decode();
-            doc.addImage(img, 'JPEG', 72, y, 468, 200);
-            y += 220;
-        } catch {
-            doc.text(`[Figure missing: ${fig}]`, 72, y);
-            y += 20;
-        }
-        qs.forEach(q => {
-            if (y > 880) { doc.addPage(); y = 72; }
-            y = addQuestion(q, y);
-        });
-    }
-
-    doc.save('Optimized_Exam.pdf');
 }
 
 // ======================
@@ -1167,7 +1192,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Failed to initialize app:', error);
         setTimeout(() => showScreen('main-menu'), 1000);
     }
-
     document.getElementById('close-image-modal').onclick = () => {
         document.getElementById('image-modal').classList.add('hidden');
     };
