@@ -936,14 +936,18 @@ function showAnalyticsScreen() {
 // ======================
 
 async function generateOfflinePDF() {
-    if (!confirm('Generate optimized Legal-size PDF with answer sheet and grouped figures?')) return;
+    if (!confirm('Generate optimized Legal-size PDF with answer sheet, questions, and figures?')) return;
 
     const { jsPDF } = window.jspdf;
-    // 8.5" × 13" = 612 × 936 points
+    const PAGE_WIDTH = 612;   // 8.5" * 72
+    const PAGE_HEIGHT = 936;  // 13" * 72
+    const MARGIN = 18;        // 0.25"
+    const COL_WIDTH = (PAGE_WIDTH - 3 * MARGIN) / 2;
+
     const doc = new jsPDF({
         orientation: 'p',
         unit: 'pt',
-        format: [612, 936]
+        format: [PAGE_WIDTH, PAGE_HEIGHT]
     });
 
     doc.setFont('courier', 'normal');
@@ -954,30 +958,25 @@ async function generateOfflinePDF() {
         const img = new Image();
         img.src = 'Practice Answer Sheet.jpg';
         await img.decode();
-        doc.addImage(img, 'JPEG', 40, 40, 532, 856);
+        doc.addImage(img, 'JPEG', MARGIN, MARGIN, PAGE_WIDTH - 2 * MARGIN, PAGE_HEIGHT - 2 * MARGIN);
     } catch {
-        doc.text('ANSWER SHEET (image missing)', 72, 72);
+        doc.text('ANSWER SHEET (image missing)', MARGIN, MARGIN);
     }
     doc.addPage();
 
-    // Group questions by figure
-    const figureGroups = {};
-    const noFigure = [];
-    const allQuestions = appState.fullQuestionBank.length ? appState.fullQuestionBank : getFallbackQuestions();
+    // === Sanitize text ===
+    function cleanText(text) {
+        return (text || '')
+            .replace(/À/g, 'π')
+            .replace(/(\d)\s+(\d{3})/g, '$1$2')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
 
-    allQuestions.forEach(q => {
-        if (q.figure) {
-            if (!figureGroups[q.figure]) figureGroups[q.figure] = [];
-            figureGroups[q.figure].push(q);
-        } else {
-            noFigure.push(q);
-        }
-    });
-
-    // Helper: draw choices
+    // === Draw choices ===
     function drawChoices(choices, x, y, maxWidth) {
         const labels = ['A.', 'B.', 'C.', 'D.'];
-        const texts = labels.map((l, i) => `${l} ${choices[i]}`);
+        const texts = labels.map((l, i) => choices[i] ? `${l} ${cleanText(choices[i])}` : '');
         const widths = texts.map(t => doc.getTextWidth(t));
         const maxChoiceWidth = Math.max(...widths);
 
@@ -989,195 +988,92 @@ async function generateOfflinePDF() {
             return y + 36;
         } else {
             texts.forEach((t, i) => {
-                doc.text(t, x, y + i * 18);
+                if (t) doc.text(t, x, y + i * 18);
             });
             return y + texts.length * 18;
         }
     }
 
-    // Helper: add question
-    function addQuestion(q, y) {
-        const maxWidth = 468;
-        const lines = doc.splitTextToSize(q.stem, maxWidth);
+    // === Add question ===
+    function addQuestion(q, qNum, x, y, colWidth) {
+        const stem = cleanText(q.stem);
+        const lines = doc.splitTextToSize(`Q${qNum}. ${stem}`, colWidth - 10);
         lines.forEach(line => {
-            if (y > 880) { doc.addPage(); y = 72; }
-            doc.text(line, 72, y);
-            y += 16;
+            if (y > PAGE_HEIGHT - MARGIN) { doc.addPage(); y = MARGIN; }
+            doc.text(line, x, y);
+            y += 14;
         });
-        y = drawChoices(q.choices, 72, y, maxWidth) + 10;
+        y = drawChoices(q.choices, x, y, colWidth - 10) + 6;
+        if (q.group_id) {
+            doc.setFont('courier', 'italic');
+            doc.text(`(Situation: ${q.group_id})`, x, y);
+            doc.setFont('courier', 'normal');
+            y += 16;
+        }
         return y;
     }
 
-    // Render no-figure questions
-    let y = 72;
-    noFigure.forEach(q => {
-        if (y > 880) { doc.addPage(); y = 72; }
-        y = addQuestion(q, y);
+    // === Organize questions ===
+    const allQuestions = appState.fullQuestionBank.length ? appState.fullQuestionBank : getFallbackQuestions();
+    const groups = {};
+    allQuestions.forEach(q => {
+        if (!groups[q.group_id || `__single_${Math.random()}`]) groups[q.group_id || `__single_${Math.random()}`] = [];
+        groups[q.group_id || `__single_${Math.random()}`].push(q);
     });
 
-    // Render grouped figures
-    for (const [fig, qs] of Object.entries(figureGroups)) {
-        doc.addPage();
-        y = 72;
-        try {
-            const img = new Image();
-            img.src = fig;
-            await img.decode();
-            doc.addImage(img, 'JPEG', 72, y, 468, 200);
-            y += 220;
-        } catch {
-            doc.text(`[Figure missing: ${fig}]`, 72, y);
-            y += 20;
-        }
-        qs.forEach(q => {
-            if (y > 880) { doc.addPage(); y = 72; }
-            y = addQuestion(q, y);
+    // === Section 1: Questions (no figures) ===
+    let qNum = 1;
+    let col1Y = MARGIN, col2Y = MARGIN, currentCol = 1;
+
+    Object.keys(groups).forEach(gid => {
+        groups[gid].forEach(q => {
+            if (q.figure) return; // skip figure questions here
+            let y = currentCol === 1 ? col1Y : col2Y;
+            if (y > PAGE_HEIGHT - 200) {
+                if (currentCol === 1) { currentCol = 2; y = col2Y; }
+                else { doc.addPage(); col1Y = col2Y = MARGIN; currentCol = 1; y = col1Y; }
+            }
+            const x = currentCol === 1 ? MARGIN : MARGIN * 2 + COL_WIDTH;
+            const newY = addQuestion(q, qNum++, x, y, COL_WIDTH);
+            if (currentCol === 1) col1Y = newY; else col2Y = newY;
         });
-    }
+    });
+
+    // === Section 2: Figures ===
+    doc.addPage();
+    doc.setFontSize(14);
+    doc.text('FIGURES SECTION', MARGIN, MARGIN);
+    doc.setFontSize(12);
+    let y = MARGIN + 20;
+
+    const seen = new Set();
+    allQuestions.forEach(q => {
+        if (q.figure && !seen.has(q.group_id)) {
+            seen.add(q.group_id);
+            if (y > PAGE_HEIGHT - 250) { doc.addPage(); y = MARGIN; }
+            doc.text(`Figure for group_id: ${q.group_id}`, MARGIN, y);
+            y += 16;
+            try {
+                const img = new Image();
+                img.src = q.figure;
+                img.onload = () => {
+                    const maxW = PAGE_WIDTH - 2 * MARGIN;
+                    const maxH = 300;
+                    let w = img.width, h = img.height;
+                    const ratio = Math.min(maxW / w, maxH / h);
+                    w *= ratio; h *= ratio;
+                    doc.addImage(img, 'JPEG', MARGIN, y, w, h);
+                };
+            } catch {
+                doc.text('(Figure not available)', MARGIN, y);
+            }
+            y += 320;
+        }
+    });
 
     doc.save('Optimized_Exam.pdf');
 }
 
-
-// ======================
-// RESET & FULL MOCK EXAM
-// ======================
-function startFullMockExam() {
-    resetExam();
-    appState.currentSection = 'AMSTHEC';
-    showScreen('instructions');
-}
-
-// ======================
-// FALLBACK QUESTIONS
-// ======================
-function getFallbackQuestions() {
-    const fallbackQuestions = [];
-    // AMSTHEC - 75 questions
-    for (let i = 1; i <= 75; i++) {
-        let stem, choices, correctAnswer;
-        if (i <= 15) {
-            const groupNum = Math.ceil(i / 5);
-            const qInGroup = ((i - 1) % 5) + 1;
-            stem = `Situation: Algebraic Problem Set ${groupNum} - Solve: ${getAlgebraEquation(groupNum, qInGroup)}`;
-            choices = getAlgebraChoices(groupNum, qInGroup);
-            correctAnswer = getAlgebraAnswer(groupNum, qInGroup);
-        } else if (i <= 30) {
-            const groupNum = Math.ceil((i - 15) / 5);
-            const qInGroup = ((i - 16) % 5) + 1;
-            stem = `Situation: Geometric Analysis ${groupNum} - ${getGeometryQuestion(groupNum, qInGroup)}`;
-            choices = getGeometryChoices(groupNum, qInGroup);
-            correctAnswer = getGeometryAnswer(groupNum, qInGroup);
-        } else if (i <= 45) {
-            const groupNum = Math.ceil((i - 30) / 5);
-            const qInGroup = ((i - 31) % 5) + 1;
-            stem = `Situation: Surveying Problem ${groupNum} - ${getSurveyingQuestion(groupNum, qInGroup)}`;
-            choices = getSurveyingChoices(groupNum, qInGroup);
-            correctAnswer = getSurveyingAnswer(groupNum, qInGroup);
-        } else if (i <= 60) {
-            const groupNum = Math.ceil((i - 45) / 5);
-            const qInGroup = ((i - 46) % 5) + 1;
-            stem = `Situation: Transportation Design ${groupNum} - ${getTransportationQuestion(groupNum, qInGroup)}`;
-            choices = getTransportationChoices(groupNum, qInGroup);
-            correctAnswer = getTransportationAnswer(groupNum, qInGroup);
-        } else {
-            stem = `Mathematics & Surveying Question ${i}: ${getIndividualMathQuestion(i)}`;
-            choices = getIndividualMathChoices(i);
-            correctAnswer = getIndividualMathAnswer(i);
-        }
-        fallbackQuestions.push({
-            "section": "AMSTHEC",
-            "group_id": i <= 60 ? `AMSTHEC-G${Math.ceil(i/5)}` : null,
-            "stem": stem,
-            "choices": choices,
-            "correct_answer": correctAnswer,
-            "difficulty": Math.ceil(Math.random() * 3),
-            "term": "False",
-            "figure": i % 10 === 0 ? "https://cdn.jsdelivr.net/gh/saydyin/ce-exam@images/figures/M12-04H.jpg" : null
-        });
-    }
-    // HPGE - 50 questions
-    for (let i = 1; i <= 50; i++) {
-        let stem, choices, correctAnswer;
-        if (i <= 10) {
-            const groupNum = Math.ceil(i / 5);
-            const qInGroup = ((i - 1) % 5) + 1;
-            stem = `Situation: Fluid Mechanics Analysis ${groupNum} - ${getFluidMechanicsQuestion(groupNum, qInGroup)}`;
-            choices = getFluidMechanicsChoices(groupNum, qInGroup);
-            correctAnswer = getFluidMechanicsAnswer(groupNum, qInGroup);
-        } else if (i <= 20) {
-            const groupNum = Math.ceil((i - 10) / 5);
-            const qInGroup = ((i - 11) % 5) + 1;
-            stem = `Situation: Hydraulic System ${groupNum} - ${getHydraulicsQuestion(groupNum, qInGroup)}`;
-            choices = getHydraulicsChoices(groupNum, qInGroup);
-            correctAnswer = getHydraulicsAnswer(groupNum, qInGroup);
-        } else if (i <= 30) {
-            const groupNum = Math.ceil((i - 20) / 5);
-            const qInGroup = ((i - 21) % 5) + 1;
-            stem = `Situation: Soil Analysis ${groupNum} - ${getSoilMechanicsQuestion(groupNum, qInGroup)}`;
-            choices = getSoilMechanicsChoices(groupNum, qInGroup);
-            correctAnswer = getSoilMechanicsAnswer(groupNum, qInGroup);
-        } else {
-            stem = `Hydraulics & Geotechnical Question ${i}: ${getIndividualHPGEQuestion(i)}`;
-            choices = getIndividualHPGEChoices(i);
-            correctAnswer = getIndividualHPGEAnswer(i);
-        }
-        fallbackQuestions.push({
-            "section": "HPGE",
-            "group_id": i <= 30 ? `HPGE-G${Math.ceil(i/5)}` : null,
-            "stem": stem,
-            "choices": choices,
-            "correct_answer": correctAnswer,
-            "difficulty": Math.ceil(Math.random() * 3),
-            "term": "False",
-            "figure": i % 8 === 0 ? "https://via.placeholder.com/300x200?text=Hydro+Diagram" : null
-        });
-    }
-    // PSAD - 75 questions
-    for (let i = 1; i <= 75; i++) {
-        let stem, choices, correctAnswer;
-        if (i <= 15) {
-            const groupNum = Math.ceil(i / 5);
-            const qInGroup = ((i - 1) % 5) + 1;
-            stem = `Situation: Structural Analysis ${groupNum} - ${getStructuralAnalysisQuestion(groupNum, qInGroup)}`;
-            choices = getStructuralAnalysisChoices(groupNum, qInGroup);
-            correctAnswer = getStructuralAnalysisAnswer(groupNum, qInGroup);
-        } else if (i <= 30) {
-            const groupNum = Math.ceil((i - 15) / 5);
-            const qInGroup = ((i - 16) % 5) + 1;
-            stem = `Situation: Concrete Structure ${groupNum} - ${getConcreteDesignQuestion(groupNum, qInGroup)}`;
-            choices = getConcreteDesignChoices(groupNum, qInGroup);
-            correctAnswer = getConcreteDesignAnswer(groupNum, qInGroup);
-        } else if (i <= 45) {
-            const groupNum = Math.ceil((i - 30) / 5);
-            const qInGroup = ((i - 31) % 5) + 1;
-            stem = `Situation: Steel Structure ${groupNum} - ${getSteelDesignQuestion(groupNum, qInGroup)}`;
-            choices = getSteelDesignChoices(groupNum, qInGroup);
-            correctAnswer = getSteelDesignAnswer(groupNum, qInGroup);
-        } else if (i <= 60) {
-            const groupNum = Math.ceil((i - 45) / 5);
-            const qInGroup = ((i - 46) % 5) + 1;
-            stem = `Situation: Construction Project ${groupNum} - ${getConstructionQuestion(groupNum, qInGroup)}`;
-            choices = getConstructionChoices(groupNum, qInGroup);
-            correctAnswer = getConstructionAnswer(groupNum, qInGroup);
-        } else {
-            stem = `Structural Design Question ${i}: ${getIndividualPSADQuestion(i)}`;
-            choices = getIndividualPSADChoices(i);
-            correctAnswer = getIndividualPSADAnswer(i);
-        }
-        fallbackQuestions.push({
-            "section": "PSAD",
-            "group_id": i <= 60 ? `PSAD-G${Math.ceil(i/5)}` : null,
-            "stem": stem,
-            "choices": choices,
-            "correct_answer": correctAnswer,
-            "difficulty": Math.ceil(Math.random() * 3),
-            "term": "False",
-            "figure": i % 12 === 0 ? "https://via.placeholder.com/300x200?text=Structure+Diagram" : null
-        });
-    }
-    return fallbackQuestions;
-}
 
 // Helper functions (same as your original)
 function getAlgebraEquation(group, question) { return "2x + 5 = 15"; }
