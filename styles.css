@@ -333,6 +333,8 @@ body.dark {
 .nav-buttons {
     display: flex;
     gap: 1rem;
+    flex-wrap: wrap; /* Added for better responsiveness */
+    justify-content: center; /* Added for better responsiveness */
 }
 
 /* ===== INSTRUCTIONS SCREEN ===== */
@@ -671,6 +673,7 @@ body.dark {
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    padding: 1rem; /* Added for small screens */
 }
 
 .modal-content {
@@ -680,7 +683,7 @@ body.dark {
     max-height: 90vh;
     overflow: auto;
     position: relative;
-    padding: 1rem;
+    padding: 1.5rem; /* Increased padding */
 }
 
 .dark .modal-content {
@@ -701,6 +704,7 @@ body.dark {
     justify-content: center;
     cursor: pointer;
     border: none;
+    z-index: 10; /* Ensure it's above image */
 }
 
 .zoomed-image {
@@ -713,6 +717,22 @@ body.dark {
 .confirm-modal {
     max-width: 28rem;
     text-align: center;
+    padding-top: 2.5rem; /* Space for modal content */
+}
+
+.confirm-modal h2 {
+    font-size: 1.25rem; /* Added */
+    font-weight: 600; /* Added */
+    margin-bottom: 0.75rem; /* Added */
+}
+
+.confirm-modal p {
+    margin-bottom: 1.5rem; /* Added */
+    color: var(--text-muted-light); /* Added */
+}
+
+.dark .confirm-modal p {
+    color: var(--text-muted-dark); /* Added */
 }
 
 .modal-buttons {
@@ -838,6 +858,12 @@ body.dark {
     
     .modal-buttons {
         flex-direction: column;
+        width: 100%; /* Added */
+        gap: 0.75rem; /* Added */
+    }
+
+    .modal-buttons .btn {
+        width: 100%; /* Added */
     }
 }
 
