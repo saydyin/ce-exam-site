@@ -932,131 +932,112 @@ function showAnalyticsScreen() {
 }
 
 // ======================
-// PDF GENERATION WITH ASPECT RATIO + ANSWER KEY
+// PDF GENERATION (Legal size, Courier, grouped figures)
 // ======================
 
-async function loadImageAsDataURL(url) {
-    const cleanUrl = url.trim();
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = 'Anonymous';
-        img.onload = () => {
-            resolve({
-                dataUrl: img.src,
-                width: img.naturalWidth,
-                height: img.naturalHeight
-            });
-        };
-        img.onerror = () => reject(new Error('Failed to load image: ' + cleanUrl));
-        img.src = cleanUrl;
-    });
-}
-
-function drawImagePreservingAspectRatio(doc, imgData, x, y, maxWidth, maxHeight) {
-    const imgRatio = imgData.width / imgData.height;
-    const maxRatio = maxWidth / maxHeight;
-    let finalWidth, finalHeight;
-    if (imgRatio > maxRatio) {
-        finalWidth = maxWidth;
-        finalHeight = maxWidth / imgRatio;
-    } else {
-        finalHeight = maxHeight;
-        finalWidth = maxHeight * imgRatio;
-    }
-    const offsetX = (maxWidth - finalWidth) / 2;
-    doc.addImage(imgData.dataUrl, 'JPEG', x + offsetX, y, finalWidth, finalHeight);
-    return finalHeight;
-}
-
 async function generateOfflinePDF() {
-    if (!confirm('Generate a PDF of ALL exam sections (with figures and answer key)? This may take a minute.')) return;
+    if (!confirm('Generate optimized Legal-size PDF with answer sheet and grouped figures?')) return;
 
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('p', 'mm', 'a4');
-    let y = 20;
+    // 8.5" × 13" = 612 × 936 points
+    const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'pt',
+        format: [612, 936]
+    });
 
-    doc.setFontSize(18);
-    doc.text("Civil Engineering Exam Simulator – Offline Copy", 14, y);
-    y += 10;
-    doc.setFontSize(11);
-    doc.text("Generated on: " + new Date().toLocaleString(), 14, y);
-    y += 15;
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(12);
 
-    if (appState.fullQuestionBank.length === 0) {
-        appState.fullQuestionBank = getFallbackQuestions();
+    // === PAGE 1: Answer Sheet ===
+    try {
+        const img = new Image();
+        img.src = 'Practice Answer Sheet.jpg';
+        await img.decode();
+        doc.addImage(img, 'JPEG', 40, 40, 532, 856);
+    } catch {
+        doc.text('ANSWER SHEET (image missing)', 72, 72);
+    }
+    doc.addPage();
+
+    // Group questions by figure
+    const figureGroups = {};
+    const noFigure = [];
+    const allQuestions = appState.fullQuestionBank.length ? appState.fullQuestionBank : getFallbackQuestions();
+
+    allQuestions.forEach(q => {
+        if (q.figure) {
+            if (!figureGroups[q.figure]) figureGroups[q.figure] = [];
+            figureGroups[q.figure].push(q);
+        } else {
+            noFigure.push(q);
+        }
+    });
+
+    // Helper: draw choices
+    function drawChoices(choices, x, y, maxWidth) {
+        const labels = ['A.', 'B.', 'C.', 'D.'];
+        const texts = labels.map((l, i) => `${l} ${choices[i]}`);
+        const widths = texts.map(t => doc.getTextWidth(t));
+        const maxChoiceWidth = Math.max(...widths);
+
+        if (maxChoiceWidth * 2 + 20 <= maxWidth) {
+            doc.text(texts[0], x, y);
+            doc.text(texts[2], x + maxWidth / 2, y);
+            doc.text(texts[1], x, y + 18);
+            doc.text(texts[3], x + maxWidth / 2, y + 18);
+            return y + 36;
+        } else {
+            texts.forEach((t, i) => {
+                doc.text(t, x, y + i * 18);
+            });
+            return y + texts.length * 18;
+        }
     }
 
-    // === EXAM QUESTIONS ===
-    for (const [key, section] of Object.entries(SECTIONS)) {
-        const questions = getQuestionsForSection(key);
+    // Helper: add question
+    function addQuestion(q, y) {
+        const maxWidth = 468;
+        const lines = doc.splitTextToSize(q.stem, maxWidth);
+        lines.forEach(line => {
+            if (y > 880) { doc.addPage(); y = 72; }
+            doc.text(line, 72, y);
+            y += 16;
+        });
+        y = drawChoices(q.choices, 72, y, maxWidth) + 10;
+        return y;
+    }
 
-        doc.setFontSize(14);
-        doc.text(`${section.title} (${key})`, 14, y);
-        y += 10;
+    // Render no-figure questions
+    let y = 72;
+    noFigure.forEach(q => {
+        if (y > 880) { doc.addPage(); y = 72; }
+        y = addQuestion(q, y);
+    });
 
-        for (let i = 0; i < questions.length; i++) {
-            const q = questions[i];
-            const stemLines = doc.splitTextToSize(`Q${i + 1}. ${q.stem}`, 180);
-            for (const line of stemLines) {
-                if (y > 270) { doc.addPage(); y = 20; }
-                doc.text(line, 14, y);
-                y += 6;
-            }
-
-            if (q.figure && q.figure.trim()) {
-                try {
-                    const imgData = await loadImageAsDataURL(q.figure);
-                    if (y + 80 > 270) { doc.addPage(); y = 20; }
-                    const usedHeight = drawImagePreservingAspectRatio(doc, imgData, 14, y, 180, 80);
-                    y += usedHeight + 5;
-                } catch (err) {
-                    console.warn('Image load failed:', q.figure, err);
-                    if (y > 270) { doc.addPage(); y = 20; }
-                    doc.setTextColor(255, 0, 0);
-                    doc.text('[Figure not available]', 14, y);
-                    doc.setTextColor(0, 0, 0);
-                    y += 8;
-                }
-            }
-
-            for (let j = 0; j < q.choices.length; j++) {
-                const letter = String.fromCharCode(65 + j);
-                const choiceLine = `${letter}. ${q.choices[j]}`;
-                const lines = doc.splitTextToSize(choiceLine, 170);
-                for (const line of lines) {
-                    if (y > 280) { doc.addPage(); y = 20; }
-                    doc.text(line, 20, y);
-                    y += 6;
-                }
-            }
-            y += 10;
-            if (y > 280) { doc.addPage(); y = 20; }
-        }
+    // Render grouped figures
+    for (const [fig, qs] of Object.entries(figureGroups)) {
         doc.addPage();
-        y = 20;
-    }
-
-    // === ANSWER KEY APPENDIX ===
-    doc.text("ANSWER KEY", 14, y);
-    y += 10;
-    doc.setFontSize(11);
-
-    for (const [key, section] of Object.entries(SECTIONS)) {
-        const questions = getQuestionsForSection(key);
-        doc.setFontSize(12);
-        doc.text(`${section.title} (${key})`, 14, y);
-        y += 8;
-
-        for (let i = 0; i < questions.length; i++) {
-            if (y > 280) { doc.addPage(); y = 20; }
-            doc.text(`Q${i + 1}: ${questions[i].correct_answer}`, 14, y);
-            y += 6;
+        y = 72;
+        try {
+            const img = new Image();
+            img.src = fig;
+            await img.decode();
+            doc.addImage(img, 'JPEG', 72, y, 468, 200);
+            y += 220;
+        } catch {
+            doc.text(`[Figure missing: ${fig}]`, 72, y);
+            y += 20;
         }
-        y += 10;
+        qs.forEach(q => {
+            if (y > 880) { doc.addPage(); y = 72; }
+            y = addQuestion(q, y);
+        });
     }
 
-    doc.save('Civil_Engineering_Exam_All.pdf');
+    doc.save('Optimized_Exam.pdf');
 }
+
 
 // ======================
 // RESET & FULL MOCK EXAM
