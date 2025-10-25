@@ -9,6 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
+  <!-- LOADING -->
   <div id="screen-loading" class="screen">
     <div class="loading-container">
       <div class="spinner"></div>
@@ -16,15 +17,14 @@
     </div>
   </div>
 
+  <!-- MAIN MENU -->
   <div id="screen-main-menu" class="screen hidden">
     <div class="container">
       <div class="header">
         <h1>Civil Engineering Exam Simulator</h1>
         <p id="progress-text">0/3 sections completed</p>
       </div>
-
       <div id="section-grid" class="section-grid"></div>
-
       <div class="action-buttons">
         <button id="btn-full-mock" class="btn btn-primary">🚀 Start Full Mock Exam</button>
         <div class="nav-buttons">
@@ -38,19 +38,17 @@
     </div>
   </div>
 
+  <!-- INSTRUCTIONS -->
   <div id="screen-instructions" class="screen hidden">
     <div class="container">
       <div class="card">
         <h1 class="section-title">Instructions</h1>
         <p id="instruction-section-title" class="section-subtitle"></p>
-
         <div class="instructions-box">
           <p class="instructions-title">Please read the following instructions carefully:</p>
           <ul id="prc-instructions" class="instructions-list"></ul>
         </div>
-
         <div id="motivational-quote" class="quote"></div>
-
         <div class="action-buttons">
           <button id="btn-instructions-back" class="btn btn-secondary">Back to Main Menu</button>
           <button id="btn-start-exam" class="btn btn-primary">Start Exam Section</button>
@@ -59,6 +57,7 @@
     </div>
   </div>
 
+  <!-- EXAM -->
   <div id="screen-exam" class="screen hidden">
     <header class="exam-header">
       <div class="container">
@@ -68,12 +67,21 @@
         </div>
         <div class="exam-controls">
           <div id="exam-timer" class="timer">05:00:00</div>
-          <button id="btn-pause-resume" class="btn btn-secondary">Pause</button>
-          <button id="btn-submit-exam" class="btn btn-primary">Submit</button>
+          <button id="btn-pause-resume" class="btn btn-secondary">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6"></path>
+            </svg>
+            Pause
+          </button>
+          <button id="btn-submit-exam" class="btn btn-primary">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Submit
+          </button>
         </div>
       </div>
     </header>
-
     <main class="exam-content">
       <div class="container">
         <div id="exam-questions-container" class="questions-container"></div>
@@ -81,9 +89,76 @@
     </main>
   </div>
 
+  <!-- SETTINGS -->
+  <div id="screen-settings" class="screen hidden">
+    <div class="container">
+      <div class="card">
+        <h1 class="section-title">Settings</h1>
+        <div class="settings-options">
+          <div class="setting-item">
+            <label>Theme</label>
+            <select id="setting-theme">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </div>
+          <div class="setting-item">
+            <label>Font Size</label>
+            <select id="setting-font">
+              <option value="small">Small</option>
+              <option value="medium">Medium</option>
+              <option value="large">Large</option>
+            </select>
+          </div>
+        </div>
+        <div class="action-buttons">
+          <button id="btn-settings-back" class="btn btn-secondary">Back to Main Menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOOKMARKS -->
+  <div id="screen-bookmarks" class="screen hidden">
+    <div class="container">
+      <h1 class="section-title">📖 Bookmarked Questions</h1>
+      <div id="bookmarks-content" class="card">
+        <!-- Content filled by JS -->
+      </div>
+      <div class="action-buttons">
+        <button id="btn-clear-bookmarks" class="btn btn-danger hidden">Clear All</button>
+        <button id="btn-bookmarks-back" class="btn btn-secondary">Back to Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS -->
+  <div id="screen-analytics" class="screen hidden">
+    <div class="container">
+      <h1 class="section-title">Performance Analytics</h1>
+      <div id="analytics-content">
+        <!-- Filled by JS -->
+      </div>
+      <div class="action-buttons">
+        <button id="btn-analytics-back" class="btn btn-secondary">Back to Main Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTS (placeholder – will be replaced dynamically, but we keep structure minimal) -->
+  <div id="screen-results" class="screen hidden"></div>
+
+  <!-- REVIEW (placeholder) -->
+  <div id="screen-review" class="screen hidden"></div>
+
+  <!-- MODALS -->
   <div id="image-modal" class="modal-overlay hidden">
     <div class="modal-content">
-      <button id="close-image-modal" class="modal-close">✖</button>
+      <button id="close-image-modal" class="modal-close">
+        <svg class="icon" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
       <img id="zoomed-image" src="" alt="Zoomed figure" class="zoomed-image">
     </div>
   </div>
