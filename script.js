@@ -101,39 +101,101 @@ function getQuestionsForSection(sectionName) {
 }
 
 function processQuestionsWithGroups(questions) {
+    // Step 1: Group by group_id
     const groupMap = {};
     questions.forEach(question => {
-        const groupKey = question.group_id || `single-${Math.random().toString(36).substring(2, 8)}`;
-        if (!groupMap[groupKey]) {
-            groupMap[groupKey] = [];
+        const gid = question.group_id;
+        if (gid) {
+            if (!groupMap[gid]) groupMap[gid] = [];
+            groupMap[gid].push(question);
+        } else {
+            const tempId = `__single_${Math.random().toString(36).substring(2, 10)}`;
+            groupMap[tempId] = [question];
         }
-        groupMap[groupKey].push(question);
     });
-    const processedGroups = Object.values(groupMap).map(group => {
-        const situationQuestion = group.find(q => q.stem.trim().startsWith('Situation'));
-        if (situationQuestion) {
-            const otherQuestions = group.filter(q => q !== situationQuestion);
-            return [situationQuestion, ...otherQuestions];
+
+    // Step 2: Separate valid Situation groups (exactly 3) from others
+    const validGroups = [];
+    const standaloneQuestions = [];
+
+    Object.entries(groupMap).forEach(([gid, group]) => {
+        if (group.length === 3 && gid !== '__single_undefined' && !gid.startsWith('__single_')) {
+            const hasSituationStem = group.some(q => q.stem.trim().startsWith('Situation'));
+            if (hasSituationStem) {
+                const sortedGroup = [...group].sort((a, b) => 
+                    a.stem.trim().startsWith('Situation') ? -1 : 
+                    b.stem.trim().startsWith('Situation') ? 1 : 0
+                );
+                validGroups.push(sortedGroup);
+            } else {
+                standaloneQuestions.push(...group);
+            }
+        } else {
+            standaloneQuestions.push(...group);
         }
-        return group;
     });
-    const shuffledGroups = shuffleArray(processedGroups);
-    let orderedQuestions = shuffledGroups.flat();
-    const checkLastN = 5;
-    const badIndex = orderedQuestions
-        .slice(-checkLastN)
-        .findIndex(q => q.stem.trim().startsWith('Situation'));
-    if (badIndex !== -1) {
-        const situationQ = orderedQuestions[orderedQuestions.length - checkLastN + badIndex];
-        const situationGroupId = situationQ.group_id;
-        const remaining = orderedQuestions.filter(q => q.group_id !== situationGroupId);
-        const movedGroup = orderedQuestions.filter(q => q.group_id === situationGroupId);
-        const insertPos = Math.floor(remaining.length / 2);
-        remaining.splice(insertPos, 0, ...movedGroup);
-        orderedQuestions = remaining;
+
+    // Step 3: Shuffle both lists independently
+    const shuffledGroups = shuffleArray(validGroups);
+    const shuffledSingles = shuffleArray(standaloneQuestions);
+
+    // Step 4: Interleave singles between groups
+    let result = [];
+    let singleIndex = 0;
+
+    if (shuffledGroups.length > 0) {
+        shuffledGroups.forEach((group, i) => {
+            result.push(...group);
+            const toAdd = Math.min(2, shuffledSingles.length - singleIndex);
+            for (let j = 0; j < toAdd; j++) {
+                result.push(shuffledSingles[singleIndex++]);
+            }
+        });
+        while (singleIndex < shuffledSingles.length) {
+            result.push(shuffledSingles[singleIndex++]);
+        }
+    } else {
+        result = shuffledSingles;
     }
-    return orderedQuestions;
+
+    // Step 5: Ensure no Situation group is in last 5 questions
+    const checkLastN = 5;
+    const tail = result.slice(-checkLastN);
+    const badIndex = tail.findIndex(q => q.stem.trim().startsWith('Situation'));
+    
+    if (badIndex !== -1) {
+        const badQ = result[result.length - checkLastN + badIndex];
+        const badGroupId = badQ.group_id;
+        if (badGroupId) {
+            const fullGroup = result.filter(q => q.group_id === badGroupId);
+            const remaining = result.filter(q => q.group_id !== badGroupId);
+            const insertPos = Math.max(3, Math.floor(remaining.length / 2));
+            remaining.splice(insertPos, 0, ...fullGroup);
+            result = remaining;
+        }
+    }
+
+    // Step 6: Sanitize group_id for non-Situation or incomplete groups
+    const groupSizeMap = {};
+    result.forEach(q => {
+        const gid = q.group_id;
+        if (gid) {
+            groupSizeMap[gid] = (groupSizeMap[gid] || 0) + 1;
+        }
+    });
+
+    result.forEach(q => {
+        const gid = q.group_id;
+        const groupSize = groupSizeMap[gid];
+        const isSituation = q.stem.trim().startsWith('Situation') || result.some(g => g.group_id === gid && g.stem.trim().startsWith('Situation'));
+        if (groupSize !== 3 || !isSituation) {
+            q.group_id = null;
+        }
+    });
+
+    return result;
 }
+
 
 function shuffleArray(array) {
     const newArray = [...array];
@@ -404,19 +466,35 @@ function renderExam() {
         });
     });
 
-    document.querySelectorAll('.choice-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const btnEl = e.target.closest('.choice-btn');
-            const questionIndex = parseInt(btnEl.dataset.question);
-            const choice = btnEl.dataset.choice;
-            selectAnswer(questionIndex, choice);
-            const questionCard = document.getElementById(`question-${questionIndex}`);
-            questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => {
-                choiceBtn.classList.remove('selected');
-            });
-            btnEl.classList.add('selected');
+document.querySelectorAll('.choice-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const btnEl = e.target.closest('.choice-btn');
+        const questionIndex = parseInt(btnEl.dataset.question);
+        const choice = btnEl.dataset.choice;
+        selectAnswer(questionIndex, choice);
+
+        const questionCard = document.getElementById(`question-${questionIndex}`);
+        questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => {
+            choiceBtn.classList.remove('selected');
         });
+        btnEl.classList.add('selected');
+
+        // Auto-scroll to next question
+        const nextIndex = questionIndex + 1;
+        const nextEl = document.getElementById(`question-${nextIndex}`);
+        if (nextEl) {
+            const header = document.querySelector('.exam-header');
+            const headerHeight = header ? header.offsetHeight : 60;
+            const elementPosition = nextEl.getBoundingClientRect().top + window.scrollY;
+            const offsetPosition = elementPosition - headerHeight - 10;
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
+        }
     });
+});
+
 
     document.querySelectorAll('img[data-figure]').forEach(img => {
         img.addEventListener('click', () => {
