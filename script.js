@@ -854,7 +854,7 @@ function showAnalyticsScreen() {
 }
 
 // ======================
-// PDF GENERATION WITH IMAGE SUPPORT
+// PDF GENERATION WITH ASPECT RATIO + ANSWER KEY
 // ======================
 
 async function loadImageAsDataURL(url) {
@@ -863,27 +863,42 @@ async function loadImageAsDataURL(url) {
         const img = new Image();
         img.crossOrigin = 'Anonymous';
         img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0);
-            resolve(canvas.toDataURL('image/jpeg', 0.9));
+            resolve({
+                dataUrl: img.src,
+                width: img.naturalWidth,
+                height: img.naturalHeight
+            });
         };
         img.onerror = () => reject(new Error('Failed to load image: ' + cleanUrl));
         img.src = cleanUrl;
     });
 }
 
+function drawImagePreservingAspectRatio(doc, imgData, x, y, maxWidth, maxHeight) {
+    const imgRatio = imgData.width / imgData.height;
+    const maxRatio = maxWidth / maxHeight;
+    let finalWidth, finalHeight;
+    if (imgRatio > maxRatio) {
+        finalWidth = maxWidth;
+        finalHeight = maxWidth / imgRatio;
+    } else {
+        finalHeight = maxHeight;
+        finalWidth = maxHeight * imgRatio;
+    }
+    const offsetX = (maxWidth - finalWidth) / 2;
+    doc.addImage(imgData.dataUrl, 'JPEG', x + offsetX, y, finalWidth, finalHeight);
+    return finalHeight;
+}
+
 async function generateOfflinePDF() {
-    if (!confirm('Generate a PDF of ALL exam sections (with figures)? This may take a minute.')) return;
+    if (!confirm('Generate a PDF of ALL exam sections (with figures and answer key)? This may take a minute.')) return;
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
     let y = 20;
 
     doc.setFontSize(18);
-    doc.text("Civil Engineering Exam - Offline Copy", 14, y);
+    doc.text("Civil Engineering Exam Simulator – Offline Copy", 14, y);
     y += 10;
     doc.setFontSize(11);
     doc.text("Generated on: " + new Date().toLocaleString(), 14, y);
@@ -893,6 +908,7 @@ async function generateOfflinePDF() {
         appState.fullQuestionBank = getFallbackQuestions();
     }
 
+    // === EXAM QUESTIONS ===
     for (const [key, section] of Object.entries(SECTIONS)) {
         const questions = getQuestionsForSection(key);
 
@@ -912,10 +928,9 @@ async function generateOfflinePDF() {
             if (q.figure && q.figure.trim()) {
                 try {
                     const imgData = await loadImageAsDataURL(q.figure);
-                    const imgHeight = 60;
-                    if (y + imgHeight > 270) { doc.addPage(); y = 20; }
-                    doc.addImage(imgData, 'JPEG', 14, y, 180, imgHeight);
-                    y += imgHeight + 5;
+                    if (y + 80 > 270) { doc.addPage(); y = 20; }
+                    const usedHeight = drawImagePreservingAspectRatio(doc, imgData, 14, y, 180, 80);
+                    y += usedHeight + 5;
                 } catch (err) {
                     console.warn('Image load failed:', q.figure, err);
                     if (y > 270) { doc.addPage(); y = 20; }
@@ -936,15 +951,30 @@ async function generateOfflinePDF() {
                     y += 6;
                 }
             }
-
             y += 10;
             if (y > 280) { doc.addPage(); y = 20; }
         }
+        doc.addPage();
+        y = 20;
+    }
 
-        if (key !== 'PSAD') {
-            doc.addPage();
-            y = 20;
+    // === ANSWER KEY APPENDIX ===
+    doc.text("ANSWER KEY", 14, y);
+    y += 10;
+    doc.setFontSize(11);
+
+    for (const [key, section] of Object.entries(SECTIONS)) {
+        const questions = getQuestionsForSection(key);
+        doc.setFontSize(12);
+        doc.text(`${section.title} (${key})`, 14, y);
+        y += 8;
+
+        for (let i = 0; i < questions.length; i++) {
+            if (y > 280) { doc.addPage(); y = 20; }
+            doc.text(`Q${i + 1}: ${questions[i].correct_answer}`, 14, y);
+            y += 6;
         }
+        y += 10;
     }
 
     doc.save('Civil_Engineering_Exam_All.pdf');
