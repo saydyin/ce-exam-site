@@ -9,7 +9,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-  <!-- LOADING -->
+  <!-- LOADING SCREEN -->
   <div id="screen-loading" class="screen">
     <div class="loading-container">
       <div class="spinner"></div>
@@ -89,7 +89,7 @@
     </main>
   </div>
 
-  <!-- SETTINGS -->
+  <!-- SETTINGS SCREEN (predefined container) -->
   <div id="screen-settings" class="screen hidden">
     <div class="container">
       <div class="card">
@@ -118,13 +118,11 @@
     </div>
   </div>
 
-  <!-- BOOKMARKS -->
+  <!-- BOOKMARKS SCREEN (predefined container) -->
   <div id="screen-bookmarks" class="screen hidden">
     <div class="container">
       <h1 class="section-title">📖 Bookmarked Questions</h1>
-      <div id="bookmarks-content" class="card">
-        <!-- Content filled by JS -->
-      </div>
+      <div id="bookmarks-content" class="card"></div>
       <div class="action-buttons">
         <button id="btn-clear-bookmarks" class="btn btn-danger hidden">Clear All</button>
         <button id="btn-bookmarks-back" class="btn btn-secondary">Back to Main Menu</button>
@@ -132,26 +130,24 @@
     </div>
   </div>
 
-  <!-- ANALYTICS -->
+  <!-- ANALYTICS SCREEN (predefined container) -->
   <div id="screen-analytics" class="screen hidden">
     <div class="container">
       <h1 class="section-title">Performance Analytics</h1>
-      <div id="analytics-content">
-        <!-- Filled by JS -->
-      </div>
+      <div id="analytics-content"></div>
       <div class="action-buttons">
         <button id="btn-analytics-back" class="btn btn-secondary">Back to Main Menu</button>
       </div>
     </div>
   </div>
 
-  <!-- RESULTS (placeholder – will be replaced dynamically, but we keep structure minimal) -->
+  <!-- RESULTS SCREEN (placeholder – filled by JS) -->
   <div id="screen-results" class="screen hidden"></div>
 
-  <!-- REVIEW (placeholder) -->
+  <!-- REVIEW SCREEN (placeholder – filled by JS) -->
   <div id="screen-review" class="screen hidden"></div>
 
-  <!-- MODALS -->
+  <!-- IMAGE MODAL -->
   <div id="image-modal" class="modal-overlay hidden">
     <div class="modal-content">
       <button id="close-image-modal" class="modal-close">
@@ -163,6 +159,7 @@
     </div>
   </div>
 
+  <!-- CONFIRMATION MODAL -->
   <div id="confirm-modal" class="modal-overlay hidden">
     <div class="modal-content confirm-modal">
       <h2 id="confirm-title"></h2>
