@@ -28,10 +28,8 @@
       <div id="section-grid" class="section-grid"></div>
       
       <div class="action-buttons">
-        <button type="button" id="btn-full-mock" class="btn btn-primary">🚀 Start Full Mock Exam</button>
         <div class="nav-buttons">
           <button type="button" id="btn-settings" class="btn btn-secondary">⚙️ Settings</button>
-          <button type="button" id="btn-analytics" class="btn btn-secondary">📊 Analytics</button>
           <button type="button" id="btn-download-pdf" class="btn btn-secondary">📄 Download for Offline</button>
         </div>
         <button type="button" id="btn-reset" class="btn btn-danger">🗑️ Reset Exam Data</button>
@@ -132,34 +130,24 @@
             <button type="button" id="btn-auto-save" class="btn btn-secondary">
               <span id="auto-save-status">✅</span> Auto-Save Answers
             </button>
+            <button type="button" id="btn-show-timer" class="btn btn-secondary">
+              <span id="show-timer-status">✅</span> Show Timer
+            </button>
+          </div>
+        </div>
+        
+        <div class="settings-group">
+          <h2>Section Progress</h2>
+          <div class="data-options">
+            <button type="button" id="btn-show-progress" class="btn btn-secondary">
+              <span id="show-progress-status">✅</span> Show Progress Bar
+            </button>
           </div>
         </div>
         
         <div class="action-buttons mt-4">
           <button type="button" id="btn-settings-back" class="btn btn-secondary">Back to Main Menu</button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Analytics Screen -->
-  <div id="screen-analytics" class="screen hidden">
-    <div class="container">
-      <h1 class="section-title">📊 Exam Analytics</h1>
-      
-      <div class="card">
-        <h2>Overall Performance</h2>
-        <p id="overall-score" class="score"></p>
-        <p id="overall-correct" class="text-center"></p>
-        <canvas id="overall-chart"></canvas>
-      </div>
-      
-      <div id="section-analytics-list">
-        <!-- Section analytics will be populated here -->
-      </div>
-      
-      <div class="action-buttons mt-4">
-        <button type="button" id="btn-analytics-back" class="btn btn-secondary">Back to Main Menu</button>
       </div>
     </div>
   </div>
@@ -185,7 +173,7 @@
         </div>
       </div>
       
-      <div class="wrong-answers-section hidden" id="wrong-answers-section">
+      <div class="wrong-answers-section" id="wrong-answers-section">
         <h2>Review Incorrect Answers</h2>
         <p class="text-center mb-4">Review your mistakes with explanations</p>
         <div id="wrong-answers-list"></div>
@@ -200,6 +188,24 @@
         <div class="review-header">
           <h1 id="review-section-title">Review Section</h1>
           <p id="review-progress" class="text-muted"></p>
+        </div>
+        
+        <div class="review-controls">
+          <div class="flex gap-4">
+            <div class="flex items-center">
+              <label for="filter-correct" class="mr-2">Filter:</label>
+              <select id="review-filter" class="btn btn-secondary">
+                <option value="all">All Questions</option>
+                <option value="correct">Correct Only</option>
+                <option value="wrong">Wrong Only</option>
+                <option value="skipped">Skipped Only</option>
+              </select>
+            </div>
+            <div class="flex items-center">
+              <label for="search-questions" class="mr-2">Search:</label>
+              <input type="text" id="review-search" placeholder="Search questions..." class="btn btn-secondary">
+            </div>
+          </div>
         </div>
         
         <div id="review-questions-container" class="review-questions-container"></div>
