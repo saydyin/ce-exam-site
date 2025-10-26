@@ -5,30 +5,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Civil Engineering Exam Simulator</title>
   <link rel="stylesheet" href="styles.css">
-  <!-- External Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
 </head>
 <body>
+  <!-- Loading Screen -->
   <div id="screen-loading" class="screen">
     <div class="loading-container">
       <div class="spinner"></div>
       <p>Preparing Your Exam...</p>
+      <p class="text-muted">Loading question bank and settings</p>
     </div>
   </div>
 
+  <!-- Main Menu -->
   <div id="screen-main-menu" class="screen hidden">
     <div class="container">
       <div class="header">
         <h1>Civil Engineering Exam Simulator</h1>
         <p id="progress-text">0/3 sections completed</p>
       </div>
+      
       <div id="section-grid" class="section-grid"></div>
+      
       <div class="action-buttons">
         <button type="button" id="btn-full-mock" class="btn btn-primary">🚀 Start Full Mock Exam</button>
         <div class="nav-buttons">
           <button type="button" id="btn-settings" class="btn btn-secondary">⚙️ Settings</button>
-          <button type="button" id="btn-bookmarks" class="btn btn-secondary">🔖 Bookmarks</button>
           <button type="button" id="btn-analytics" class="btn btn-secondary">📊 Analytics</button>
           <button type="button" id="btn-download-pdf" class="btn btn-secondary">📄 Download for Offline</button>
         </div>
@@ -37,16 +39,20 @@
     </div>
   </div>
 
+  <!-- Instructions Screen -->
   <div id="screen-instructions" class="screen hidden">
     <div class="container">
       <div class="card">
-        <h1 class="section-title">Instructions</h1>
+        <h1 class="section-title">Exam Instructions</h1>
         <p id="instruction-section-title" class="section-subtitle"></p>
+        
         <div class="instructions-box">
           <p class="instructions-title">Please read the following instructions carefully:</p>
           <ul id="prc-instructions" class="instructions-list"></ul>
         </div>
+        
         <div id="motivational-quote" class="quote"></div>
+        
         <div class="action-buttons">
           <button type="button" id="btn-instructions-back" class="btn btn-secondary">Back to Main Menu</button>
           <button type="button" id="btn-start-exam" class="btn btn-primary">Start Exam Section</button>
@@ -55,6 +61,7 @@
     </div>
   </div>
 
+  <!-- Exam Screen -->
   <div id="screen-exam" class="screen hidden">
     <header class="exam-header">
       <div class="container">
@@ -83,15 +90,17 @@
     <footer class="exam-footer">
       <div class="container">
         <button type="button" id="btn-jump-to-first" class="btn btn-secondary btn-sm">Jump to first unanswered</button>
-        <button type="button" id="btn-nav-next" class="btn btn-primary btn-sm hidden">Next Question</button>
+        <button type="button" id="btn-nav-next" class="btn btn-primary btn-sm">Next Question</button>
       </div>
     </footer>
   </div>
 
+  <!-- Settings Screen -->
   <div id="screen-settings" class="screen hidden">
     <div class="container">
       <div class="card">
         <h1 class="section-title">⚙️ Settings</h1>
+        
         <div class="settings-group">
           <h2>Theme</h2>
           <div class="theme-switcher">
@@ -99,6 +108,7 @@
             <button type="button" id="theme-dark" class="btn btn-secondary">🌙 Dark</button>
           </div>
         </div>
+        
         <div class="settings-group">
           <h2>Font Size</h2>
           <div class="font-switcher">
@@ -107,6 +117,7 @@
             <button type="button" id="font-large" class="btn btn-secondary btn-lg">A Large</button>
           </div>
         </div>
+        
         <div class="settings-group">
           <h2>Navigation Mode</h2>
           <div class="nav-mode-switcher">
@@ -114,15 +125,16 @@
             <button type="button" id="nav-step" class="btn btn-secondary">Step-by-step</button>
           </div>
         </div>
+        
         <div class="settings-group">
-          <h2>Data Management</h2>
+          <h2>Exam Settings</h2>
           <div class="data-options">
-            <button type="button" id="btn-export-data" class="btn btn-secondary">Export Data</button>
-            <button type="button" id="btn-import-data" class="btn btn-secondary">Import Data</button>
-            <input type="file" id="import-file" accept="application/json" class="hidden" aria-label="Import exam data from JSON file">
-            <button type="button" id="btn-clear-cache" class="btn btn-danger">Clear Local Cache</button>
+            <button type="button" id="btn-auto-save" class="btn btn-secondary">
+              <span id="auto-save-status">✅</span> Auto-Save Answers
+            </button>
           </div>
         </div>
+        
         <div class="action-buttons mt-4">
           <button type="button" id="btn-settings-back" class="btn btn-secondary">Back to Main Menu</button>
         </div>
@@ -130,60 +142,92 @@
     </div>
   </div>
 
-  <div id="screen-bookmarks" class="screen hidden">
-    <div class="container">
-      <h1 class="section-title">🔖 Bookmarks</h1>
-      <p id="bookmarks-message" class="text-center"></p>
-      <div id="bookmarks-list" class="flex flex-col gap-4 mt-4"></div>
-      <div class="action-buttons mt-4">
-        <button type="button" id="btn-bookmarks-back" class="btn btn-secondary">Back to Main Menu</button>
-      </div>
-    </div>
-  </div>
-
+  <!-- Analytics Screen -->
   <div id="screen-analytics" class="screen hidden">
     <div class="container">
-      <h1 class="section-title">📊 Analytics</h1>
-      <div id="analytics-content" class="card">
+      <h1 class="section-title">📊 Exam Analytics</h1>
+      
+      <div class="card">
         <h2>Overall Performance</h2>
-        <p id="overall-score"></p>
-        <p id="overall-correct"></p>
+        <p id="overall-score" class="score"></p>
+        <p id="overall-correct" class="text-center"></p>
         <canvas id="overall-chart"></canvas>
-        <div id="section-analytics-list"></div>
       </div>
-      <div class="action-buttons">
+      
+      <div id="section-analytics-list">
+        <!-- Section analytics will be populated here -->
+      </div>
+      
+      <div class="action-buttons mt-4">
         <button type="button" id="btn-analytics-back" class="btn btn-secondary">Back to Main Menu</button>
       </div>
     </div>
   </div>
 
-  <div id="screen-results" class="screen hidden"></div>
-  <div id="screen-review" class="screen hidden"></div>
-
-  <div id="image-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <button type="button" id="close-image-modal" class="modal-close" aria-label="Close image">
-        <svg class="icon" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-      </button>
-      <img id="zoomed-image" src="" alt="Zoomed figure" class="zoomed-image">
+  <!-- Results Screen -->
+  <div id="screen-results" class="screen hidden">
+    <div class="container results-container">
+      <div class="results-card">
+        <h1 class="section-title">Exam Results</h1>
+        <p id="results-section-title"></p>
+        <p class="score-message" id="score-message"></p>
+        <div class="score" id="results-score">0%</div>
+        
+        <div class="stats-grid">
+          <div class="stat-item"><span>Total Questions</span><div class="stat-value" id="total-questions">0</div></div>
+          <div class="stat-item"><span>Correct Answers</span><div class="stat-value text-green-500" id="correct-answers">0</div></div>
+          <div class="stat-item"><span>Wrong/Skipped</span><div class="stat-value text-red-500" id="wrong-answers">0</div></div>
+        </div>
+        
+        <div class="action-buttons">
+          <button type="button" id="btn-results-main-menu" class="btn btn-secondary">Back to Main Menu</button>
+          <button type="button" id="btn-review-section" class="btn btn-primary">Review Answers</button>
+        </div>
+      </div>
+      
+      <div class="wrong-answers-section hidden" id="wrong-answers-section">
+        <h2>Review Incorrect Answers</h2>
+        <p class="text-center mb-4">Review your mistakes with explanations</p>
+        <div id="wrong-answers-list"></div>
+      </div>
     </div>
   </div>
 
+  <!-- Review Screen -->
+  <div id="screen-review" class="screen hidden">
+    <div class="container">
+      <div class="card">
+        <div class="review-header">
+          <h1 id="review-section-title">Review Section</h1>
+          <p id="review-progress" class="text-muted"></p>
+        </div>
+        
+        <div id="review-questions-container" class="review-questions-container"></div>
+        
+        <div class="action-buttons mt-4">
+          <button type="button" id="btn-review-back" class="btn btn-secondary">Back to Main Menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
   <div id="confirm-modal" class="modal-overlay hidden">
     <div class="modal-content confirm-modal">
       <h2 id="confirm-title"></h2>
       <p id="confirm-message"></p>
       <div class="modal-buttons">
         <button type="button" id="btn-confirm-cancel" class="btn btn-secondary">Cancel</button>
-        <button type="button" id="btn-confirm-ok" class="btn btn-primary">OK</button>
+        <button type="button" id="btn-confirm-ok" class="btn btn-primary">Yes, Proceed</button>
       </div>
     </div>
   </div>
 
+  <!-- PDF Container (for printing) -->
   <div id="pdf-container" class="printable-container hidden"></div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
