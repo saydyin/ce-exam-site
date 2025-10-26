@@ -33,6 +33,7 @@ body {
     line-height: 1.5;
     transition: background-color 0.3s, color 0.3s;
     font-size: 1rem;
+    overflow-x: hidden;
 }
 body.dark {
     background-color: var(--bg-dark);
@@ -509,7 +510,7 @@ body.nav-step {
     color: #c084fc;
 }
 
-/* Exam Footer */
+/* Exam Footer - Fixed for mobile */
 .exam-footer {
     position: fixed;
     bottom: 0;
@@ -519,6 +520,7 @@ body.nav-step {
     box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
     padding: 0.75rem 0;
     z-index: 10;
+    transition: transform 0.3s ease;
 }
 .dark .exam-footer {
     background: var(--bg-card-dark);
@@ -527,6 +529,9 @@ body.nav-step {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+.exam-footer.hidden {
+    transform: translateY(100%);
 }
 
 /* Step Navigation Mode */
@@ -948,8 +953,73 @@ body.nav-step {
   }
 }
 
-/* ===== ACCESSIBILITY ===== */
+/* ===== ACCESSIBILITY & MOBILE OPTIMIZATIONS ===== */
 :focus-visible {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
+}
+
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+    .exam-footer {
+        padding: 0.6rem 0;
+    }
+    
+    .exam-controls {
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.5rem;
+    }
+    
+    .timer {
+        font-size: 1.25rem;
+        padding: 0.4rem 0.8rem;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .nav-buttons {
+        width: 100%;
+    }
+    
+    .btn {
+        width: 100%;
+        max-width: none;
+    }
+    
+    .btn-sm {
+        font-size: 0.7rem;
+        padding: 0.3rem 0.6rem;
+    }
+    
+    .btn-lg {
+        font-size: 0.9rem;
+        padding: 0.5rem 1.5rem;
+    }
+    
+    .exam-content {
+        padding-bottom: 4rem; /* Extra space for footer */
+    }
+    
+    /* Hide jump button on mobile in step mode */
+    .nav-step .exam-footer #btn-jump-to-first {
+        display: none;
+    }
+    
+    /* Better mobile question layout */
+    .question-stem {
+        font-size: 0.95rem;
+    }
+    
+    .choices-container {
+        gap: 0.5rem;
+    }
+    
+    .choice-btn {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.9rem;
+    }
 }
