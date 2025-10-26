@@ -200,7 +200,7 @@ function processQuestionsWithGroups(questions) {
     // Now we have all questions organized into groups
     // We need to flatten the groups while preserving their internal order
     
-    // First, we'll separate the groups into situation groups and standalone questions
+    // First, separate into situation groups and standalone questions
     const situationGroups = [];
     const standaloneQuestions = [];
     
@@ -232,9 +232,8 @@ function processQuestionsWithGroups(questions) {
     // Add standalone questions
     finalQuestions.push(...randomizedStandalone);
     
-    // Apply additional randomization if needed (for non-situation questions)
+    // For better user experience, interleave situation groups with standalone questions
     if (appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize)) {
-        // We'll interleave situation groups with standalone questions
         finalQuestions = [];
         
         const interleaved = [];
@@ -1063,12 +1062,12 @@ function submitExam() {
         // Track performance data for future analysis
         if (!appState.performanceData[sectionName]) {
             appState.performanceData[sectionName] = {
-                topicPerformance: {},
                 difficultyDistribution: {
                     easy: 0,
                     medium: 0,
                     hard: 0
                 },
+                topicPerformance: {},
                 answerPatterns: {
                     commonMistakes: []
                 }
@@ -1114,7 +1113,7 @@ function submitExam() {
     
     appState.isPaused = false;
     saveState();
-    showResultsScreen(sectionName);
+    showScreen('results');
 }
 
 // ======================
