@@ -1140,54 +1140,18 @@ body.nav-step {
     color: #991b1b;
 }
 
-/* Solution Template */
-.solution-template {
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius);
-    padding: 1.5rem;
+/* Custom Exam Builder */
+.custom-exam-builder {
+    max-width: 768px;
+    margin: 0 auto;
 }
-.solution-header {
+.range-container {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    gap: 1rem;
 }
-.solution-steps {
-    background: #f9fafb;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius);
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-.solution-note {
-    background: #f0f9ff;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius);
-    padding: 1rem;
-}
-.solution-footer {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 1rem;
-}
-.solution-rating,
-.solution-topic {
-    background: #f9fafb;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius);
-    padding: 0.5rem;
-    font-size: 0.875rem;
-}
-.topic-badge {
-    background: var(--primary-color);
-    color: white;
-    border-radius: 9999px;
-    padding: 0.15rem 0.5rem;
-    font-size: 0.75rem;
+.range-value {
     font-weight: bold;
-}
-.solution-actions button {
-    margin-left: 0.5rem;
 }
 
 /* ===== MOBILE OPTIMIZATIONS ===== */
@@ -1263,5 +1227,14 @@ body.nav-step {
     .review-controls select,
     .review-controls input {
         max-width: 100%;
+    }
+    
+    /* Custom exam builder mobile */
+    .range-container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .range-value {
+        margin-left: 0.5rem;
     }
 }
