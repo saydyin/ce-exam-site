@@ -25,6 +25,10 @@
         <p id="progress-text">0/3 sections completed</p>
       </div>
       
+      <div class="action-buttons mb-4">
+        <button type="button" id="btn-custom-exam" class="btn btn-primary">🎯 Create Custom Exam</button>
+      </div>
+      
       <div id="section-grid" class="section-grid"></div>
       
       <div class="action-buttons">
@@ -33,6 +37,92 @@
           <button type="button" id="btn-download-pdf" class="btn btn-secondary">📄 Download for Offline</button>
         </div>
         <button type="button" id="btn-reset" class="btn btn-danger">🗑️ Reset Exam Data</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Exam Builder -->
+  <div id="screen-custom-exam" class="screen hidden">
+    <div class="container">
+      <div class="card">
+        <h1 class="section-title">🎯 Create Custom Exam</h1>
+        
+        <div class="mb-4">
+          <h2>Exam Configuration</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="section-card">
+              <h3 class="font-bold mb-2">Section Selection</h3>
+              <div class="flex flex-col gap-2">
+                <label class="flex items-center">
+                  <input type="checkbox" id="amsthec-include" class="mr-2" checked>
+                  <span>AMSTHEC (75 questions)</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="checkbox" id="hpge-include" class="mr-2" checked>
+                  <span>HPGE (50 questions)</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="checkbox" id="psad-include" class="mr-2" checked>
+                  <span>PSAD (75 questions)</span>
+                </label>
+              </div>
+            </div>
+            
+            <div class="section-card">
+              <h3 class="font-bold mb-2">Exam Options</h3>
+              <div class="flex flex-col gap-2">
+                <label class="flex items-center">
+                  <input type="checkbox" id="randomize-questions" class="mr-2" checked>
+                  <span>Randomize questions</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="checkbox" id="include-timer" class="mr-2" checked>
+                  <span>Include timer</span>
+                </label>
+                <div class="flex items-center">
+                  <label for="difficulty-filter" class="mr-2">Difficulty:</label>
+                  <select id="difficulty-filter" class="btn btn-secondary">
+                    <option value="all">All difficulties</option>
+                    <option value="easy">Easy only</option>
+                    <option value="medium">Medium only</option>
+                    <option value="hard">Hard only</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mb-4">
+          <h2>Question Selection</h2>
+          <div class="section-card">
+            <div class="flex flex-col md:flex-row gap-4">
+              <div class="w-full md:w-1/2">
+                <label class="block mb-1">Number of Questions</label>
+                <input type="range" id="question-count" min="10" max="200" value="100" class="w-full">
+                <div class="flex justify-between text-sm">
+                  <span>10</span>
+                  <span id="question-count-value">100</span>
+                  <span>200</span>
+                </div>
+              </div>
+              <div class="w-full md:w-1/2">
+                <label class="block mb-1">Time Limit (hours)</label>
+                <input type="range" id="time-limit" min="1" max="10" value="4" class="w-full">
+                <div class="flex justify-between text-sm">
+                  <span>1 hour</span>
+                  <span id="time-limit-value">4 hours</span>
+                  <span>10 hours</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="action-buttons">
+          <button type="button" id="btn-custom-exam-back" class="btn btn-secondary">Back to Main Menu</button>
+          <button type="button" id="btn-create-custom-exam" class="btn btn-primary">Create Exam</button>
+        </div>
       </div>
     </div>
   </div>
@@ -133,6 +223,9 @@
             <button type="button" id="btn-show-timer" class="btn btn-secondary">
               <span id="show-timer-status">✅</span> Show Timer
             </button>
+            <button type="button" id="btn-randomize-questions" class="btn btn-secondary">
+              <span id="randomize-status">✅</span> Randomize Questions
+            </button>
           </div>
         </div>
         
@@ -141,6 +234,9 @@
           <div class="data-options">
             <button type="button" id="btn-show-progress" class="btn btn-secondary">
               <span id="show-progress-status">✅</span> Show Progress Bar
+            </button>
+            <button type="button" id="btn-show-difficulty" class="btn btn-secondary">
+              <span id="show-difficulty-status">✅</span> Show Difficulty
             </button>
           </div>
         </div>
@@ -173,6 +269,78 @@
         </div>
       </div>
       
+      <!-- New: Performance Heatmap -->
+      <div class="card mt-4">
+        <h2 class="section-title">Performance Heatmap</h2>
+        <p>Identify your strongest and weakest areas</p>
+        <canvas id="performance-heatmap" height="200"></canvas>
+        <div class="mt-4">
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 bg-red-500"></div>
+            <span>Weak (0-50%)</span>
+            <div class="w-4 h-4 bg-yellow-500 ml-4"></div>
+            <span>Average (51-75%)</span>
+            <div class="w-4 h-4 bg-green-500 ml-4"></div>
+            <span>Strong (76-100%)</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- New: Study Focus Generator -->
+      <div class="card mt-4">
+        <h2 class="section-title">Study Focus Recommendations</h2>
+        <p class="text-muted">Based on your performance, here's what to focus on next</p>
+        <div id="study-focus-container"></div>
+      </div>
+      
+      <!-- New: Solution Template -->
+      <div class="card mt-4">
+        <h2 class="section-title">Solution Template</h2>
+        <p class="text-muted">Click "View Solution" on any question to see the full explanation</p>
+        <div class="solution-template">
+          <div class="solution-header">
+            <h3>Question 1: Sample Question</h3>
+            <p class="question-stem">A sample question stem that would appear on the actual exam.</p>
+            <div class="solution-actions">
+              <button type="button" class="btn btn-secondary btn-sm">View Solution</button>
+              <button type="button" class="btn btn-primary btn-sm">Hide Solution</button>
+            </div>
+          </div>
+          
+          <div class="solution-content hidden">
+            <div class="solution-steps">
+              <h4>Step 1: Understanding the Problem</h4>
+              <p>This is where the explanation would begin, breaking down how to approach the question.</p>
+              
+              <h4>Step 2: Key Formulas</h4>
+              <p>Relevant formulas would be listed here with explanations of each variable.</p>
+              
+              <h4>Step 3: Calculation</h4>
+              <p>Detailed calculation process showing how to arrive at the answer.</p>
+              
+              <h4>Step 4: Final Answer</h4>
+              <p>Explanation of why the answer is correct and common pitfalls to avoid.</p>
+            </div>
+            
+            <div class="solution-note mt-4">
+              <h4>Pro Tip:</h4>
+              <p>This is where additional tips and insights would be provided to help you understand the concept better.</p>
+            </div>
+          </div>
+          
+          <div class="solution-footer mt-4">
+            <div class="solution-rating">
+              <span>Difficulty:</span>
+              <span class="difficulty-badge difficulty-medium">Medium</span>
+            </div>
+            <div class="solution-topic">
+              <span>Topic:</span>
+              <span class="topic-badge">Hydrology</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <div class="wrong-answers-section" id="wrong-answers-section">
         <h2>Review Incorrect Answers</h2>
         <p class="text-center mb-4">Review your mistakes with explanations</p>
@@ -191,19 +359,37 @@
         </div>
         
         <div class="review-controls">
-          <div class="flex gap-4">
+          <div class="flex flex-col md:flex-row gap-4">
             <div class="flex items-center">
-              <label for="filter-correct" class="mr-2">Filter:</label>
+              <label for="review-filter" class="mr-2">Filter:</label>
               <select id="review-filter" class="btn btn-secondary">
                 <option value="all">All Questions</option>
                 <option value="correct">Correct Only</option>
                 <option value="wrong">Wrong Only</option>
                 <option value="skipped">Skipped Only</option>
+                <option value="flagged">Flagged Only</option>
               </select>
             </div>
             <div class="flex items-center">
-              <label for="search-questions" class="mr-2">Search:</label>
-              <input type="text" id="review-search" placeholder="Search questions..." class="btn btn-secondary">
+              <label for="review-difficulty" class="mr-2">Difficulty:</label>
+              <select id="review-difficulty" class="btn btn-secondary">
+                <option value="all">All Difficulties</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+            <div class="flex items-center flex-grow">
+              <label for="review-search" class="mr-2">Search:</label>
+              <input type="text" id="review-search" placeholder="Search questions..." class="btn btn-secondary flex-grow">
+            </div>
+          </div>
+          
+          <!-- New: Answer Pattern Analysis -->
+          <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <h3 class="font-bold mb-2">Answer Pattern Analysis</h3>
+            <div id="answer-patterns" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Will be populated dynamically -->
             </div>
           </div>
         </div>
@@ -226,6 +412,18 @@
         <button type="button" id="btn-confirm-cancel" class="btn btn-secondary">Cancel</button>
         <button type="button" id="btn-confirm-ok" class="btn btn-primary">Yes, Proceed</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Image Modal -->
+  <div id="image-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <button type="button" id="close-image-modal" class="modal-close" aria-label="Close image">
+        <svg class="icon" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+      <img id="zoomed-image" src="" alt="Zoomed figure" class="zoomed-image">
     </div>
   </div>
 
