@@ -160,89 +160,109 @@ function getQuestionsForSection(sectionName) {
 }
 
 function processQuestionsWithGroups(questions) {
+    // First, group questions by group_id
     const groupMap = {};
     questions.forEach(question => {
         const gid = question.group_id;
         if (gid) {
-            if (!groupMap[gid]) groupMap[gid] = [];
+            if (!groupMap[gid]) {
+                groupMap[gid] = [];
+            }
             groupMap[gid].push(question);
         } else {
+            // For questions without group_id, create a unique ID
             const tempId = `__single_${Math.random().toString(36).substring(2, 10)}`;
-            groupMap[tempId] = [question];
+            if (!groupMap[tempId]) {
+                groupMap[tempId] = [];
+            }
+            groupMap[tempId].push(question);
         }
     });
-    const validGroups = [];
+    
+    // Process each group to ensure "Situation" questions are first
+    const processedGroups = Object.values(groupMap).map(group => {
+        // Check if this is a valid situation group (should have 3 questions)
+        const isSituationGroup = group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3;
+        
+        if (isSituationGroup) {
+            // Sort the group to put Situation first
+            return group.sort((a, b) => {
+                if (a.stem.trim().startsWith('Situation')) return -1;
+                if (b.stem.trim().startsWith('Situation')) return 1;
+                return 0;
+            });
+        }
+        
+        // For non-situation groups, return as is
+        return group;
+    });
+    
+    // Now we have all questions organized into groups
+    // We need to flatten the groups while preserving their internal order
+    
+    // First, we'll separate the groups into situation groups and standalone questions
+    const situationGroups = [];
     const standaloneQuestions = [];
-    Object.entries(groupMap).forEach(([gid, group]) => {
-        if (group.length === 3 && gid !== '__single_undefined' && !gid.startsWith('__single_')) {
-            const hasSituationStem = group.some(q => q.stem.trim().startsWith('Situation'));
-            if (hasSituationStem) {
-                const sortedGroup = [...group].sort((a, b) => 
-                    a.stem.trim().startsWith('Situation') ? -1 : 
-                    b.stem.trim().startsWith('Situation') ? 1 : 0
-                );
-                validGroups.push(sortedGroup);
-            } else {
-                standaloneQuestions.push(...group);
-            }
+    
+    processedGroups.forEach(group => {
+        if (group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3) {
+            situationGroups.push(group);
         } else {
             standaloneQuestions.push(...group);
         }
     });
-    const shuffledGroups = shuffleArray(validGroups);
-    const shuffledSingles = shuffleArray(standaloneQuestions);
-    let result = [];
-    let singleIndex = 0;
-    if (shuffledGroups.length > 0) {
-        shuffledGroups.forEach((group, i) => {
-            result.push(...group);
-            const toAdd = Math.min(2, shuffledSingles.length - singleIndex);
-            for (let j = 0; j < toAdd; j++) {
-                result.push(shuffledSingles[singleIndex++]);
-            }
-        });
-        while (singleIndex < shuffledSingles.length) {
-            result.push(shuffledSingles[singleIndex++]);
-        }
-    } else {
-        result = shuffledSingles;
-    }
-    const checkLastN = 5;
-    const tail = result.slice(-checkLastN);
-    const badIndex = tail.findIndex(q => q.stem.trim().startsWith('Situation'));
-    if (badIndex !== -1) {
-        const badQ = result[result.length - checkLastN + badIndex];
-        const badGroupId = badQ.group_id;
-        if (badGroupId) {
-            const fullGroup = result.filter(q => q.group_id === badGroupId);
-            const remaining = result.filter(q => q.group_id !== badGroupId);
-            const insertPos = Math.max(3, Math.floor(remaining.length / 2));
-            remaining.splice(insertPos, 0, ...fullGroup);
-            result = remaining;
-        }
-    }
-    const groupSizeMap = {};
-    result.forEach(q => {
-        const gid = q.group_id;
-        if (gid) {
-            groupSizeMap[gid] = (groupSizeMap[gid] || 0) + 1;
-        }
-    });
-    result.forEach(q => {
-        const gid = q.group_id;
-        const groupSize = groupSizeMap[gid];
-        const isSituation = q.stem.trim().startsWith('Situation') || result.some(g => g.group_id === gid && g.stem.trim().startsWith('Situation'));
-        if (groupSize !== 3 || !isSituation) {
-            q.group_id = null;
-        }
+    
+    // Randomize the situation groups and standalone questions
+    const randomizedSituationGroups = appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize) 
+        ? shuffleArray(situationGroups) 
+        : situationGroups;
+        
+    const randomizedStandalone = appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize) 
+        ? shuffleArray(standaloneQuestions) 
+        : standaloneQuestions;
+    
+    // Create final question list with situation groups first
+    let finalQuestions = [];
+    
+    // Add situation groups
+    randomizedSituationGroups.forEach(group => {
+        finalQuestions.push(...group);
     });
     
-    // Apply randomization if enabled
+    // Add standalone questions
+    finalQuestions.push(...randomizedStandalone);
+    
+    // Apply additional randomization if needed (for non-situation questions)
     if (appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize)) {
-        result = shuffleArray(result);
+        // We'll interleave situation groups with standalone questions
+        finalQuestions = [];
+        
+        const interleaved = [];
+        let situationIndex = 0;
+        let standaloneIndex = 0;
+        
+        // Alternate between situation groups and standalone questions
+        while (situationIndex < randomizedSituationGroups.length || standaloneIndex < randomizedStandalone.length) {
+            // Add 1 situation group (3 questions)
+            if (situationIndex < randomizedSituationGroups.length) {
+                interleaved.push(...randomizedSituationGroups[situationIndex]);
+                situationIndex++;
+            }
+            
+            // Add 1-2 standalone questions
+            const numStandalone = Math.min(2, randomizedStandalone.length - standaloneIndex);
+            if (numStandalone > 0) {
+                for (let i = 0; i < numStandalone; i++) {
+                    interleaved.push(randomizedStandalone[standaloneIndex + i]);
+                }
+                standaloneIndex += numStandalone;
+            }
+        }
+        
+        finalQuestions = interleaved;
     }
     
-    return result;
+    return finalQuestions;
 }
 
 function shuffleArray(array) {
@@ -294,7 +314,9 @@ function showScreen(screenId) {
         } else if (screenId === 'settings') {
             renderSettingsScreen();
         } else if (screenId === 'results') {
-            // Results are rendered by submitExam(), so nothing to do here
+            // Auto-scroll to top when showing results
+            window.scrollTo(0, 0);
+            renderResultsScreen();
         } else if (screenId === 'review') {
             // Handled by showReviewScreen()
         } else if (screenId === 'custom-exam') {
@@ -1183,7 +1205,8 @@ function analyzeAnswerPatterns(questions, answers) {
 // ======================
 // RESULTS SCREEN
 // ======================
-function showResultsScreen(sectionName) {
+function renderResultsScreen() {
+    const sectionName = appState.currentSection;
     const result = appState.results[sectionName];
     const section = sectionName === 'CUSTOM' 
         ? { title: 'Custom Exam' } 
@@ -1246,8 +1269,15 @@ function showResultsScreen(sectionName) {
                     <p>Time spent: ${Math.floor(wrong.time_spent / 60)}m ${wrong.time_spent % 60}s</p>
                     <p>Difficulty: <span class="difficulty-badge difficulty-${wrong.difficulty}">${wrong.difficulty}</span></p>
                     ${wrong.notes ? `<p>Note: ${wrong.notes}</p>` : ''}
+                    <button type="button" class="btn btn-primary btn-sm mt-2 view-solution">View Solution</button>
                 </div>
             `;
+            
+            // Add solution button functionality
+            wrongCard.querySelector('.view-solution').addEventListener('click', () => {
+                showSolution(wrong);
+            });
+            
             wrongAnswersList.appendChild(wrongCard);
         });
     } else {
@@ -1263,9 +1293,71 @@ function showResultsScreen(sectionName) {
     // Set up button actions
     document.getElementById('btn-results-main-menu').onclick = () => showScreen('main-menu');
     document.getElementById('btn-review-section').onclick = () => showReviewScreen(sectionName);
+}
+
+// ======================
+// SOLUTION TEMPLATE
+// ======================
+function showSolution(wrongQuestion) {
+    // Create solution modal
+    const solutionModal = document.createElement('div');
+    solutionModal.className = 'modal-overlay';
+    solutionModal.style.zIndex = 60;
+    solutionModal.innerHTML = `
+        <div class="modal-content" style="max-width: 80%; max-height: 80vh; overflow-y: auto; position: relative;">
+            <h2 class="section-title">Question ${wrongQuestion.number}</h2>
+            
+            <div class="question-stem mb-4">${wrongQuestion.stem}</div>
+            
+            <div class="solution-header mb-4">
+                <h3>Solution</h3>
+                <button type="button" class="btn btn-primary close-solution">Close</button>
+            </div>
+            
+            <div class="solution-content">
+                <div class="solution-steps">
+                    <h4>Step 1: Understanding the Problem</h4>
+                    <p>${wrongQuestion.solution?.step1 || 'This is where the explanation would begin, breaking down how to approach the question.'}</p>
+                    
+                    <h4>Step 2: Key Formulas</h4>
+                    <p>${wrongQuestion.solution?.step2 || 'Relevant formulas would be listed here with explanations of each variable.'}</p>
+                    
+                    <h4>Step 3: Calculation</h4>
+                    <p>${wrongQuestion.solution?.step3 || 'Detailed calculation process showing how to arrive at the answer.'}</p>
+                    
+                    <h4>Step 4: Final Answer</h4>
+                    <p>${wrongQuestion.solution?.step4 || 'Explanation of why the answer is correct and common pitfalls to avoid.'}</p>
+                </div>
+                
+                <div class="solution-note mt-4">
+                    <h4>Pro Tip:</h4>
+                    <p>${wrongQuestion.solution?.proTip || 'This is where additional tips and insights would be provided to help you understand the concept better.'}</p>
+                </div>
+                
+                <div class="solution-footer mt-4">
+                    <div class="solution-rating">
+                        <span>Difficulty:</span>
+                        <span class="difficulty-badge difficulty-${wrongQuestion.difficulty}">${wrongQuestion.difficulty.charAt(0).toUpperCase()}</span>
+                    </div>
+                    <div class="solution-topic">
+                        <span>Topic:</span>
+                        <span class="topic-badge">${wrongQuestion.topic || 'General'}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
     
-    // Show the screen
-    showScreen('results');
+    // Add to document
+    document.body.appendChild(solutionModal);
+    
+    // Close button
+    solutionModal.querySelector('.close-solution').addEventListener('click', () => {
+        document.body.removeChild(solutionModal);
+    });
+    
+    // Auto-scroll to top
+    window.scrollTo(0, 0);
 }
 
 function renderPerformanceHeatmap(result) {
@@ -1811,6 +1903,36 @@ function generateOfflinePDF() {
                 yPos += 6;
             });
             
+            // Add solution template for this question
+            if (question.solution) {
+                yPos += 10;
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Solution:', 20, yPos);
+                yPos += 6;
+                
+                // Step 1
+                doc.setFontSize(10);
+                doc.text('Step 1: ' + (question.solution.step1 || 'Understanding the problem'), 20, yPos);
+                yPos += 5;
+                
+                // Step 2
+                doc.text('Step 2: ' + (question.solution.step2 || 'Key formulas'), 20, yPos);
+                yPos += 5;
+                
+                // Step 3
+                doc.text('Step 3: ' + (question.solution.step3 || 'Calculation'), 20, yPos);
+                yPos += 5;
+                
+                // Step 4
+                doc.text('Step 4: ' + (question.solution.step4 || 'Final answer'), 20, yPos);
+                yPos += 5;
+                
+                // Pro Tip
+                doc.text('Pro Tip: ' + (question.solution.proTip || 'Additional insights'), 20, yPos);
+                yPos += 10;
+            }
+            
             yPos += 10;
         });
         
@@ -1840,6 +1962,13 @@ function getFallbackQuestions() {
             section: "AMSTHEC",
             topic: "Trigonometry",
             difficulty: "medium",
+            solution: {
+                step1: "Identify the triangle formed by the surveyor, the top of the building, and the base of the building.",
+                step2: "Use the tangent function: tan(θ) = opposite/adjacent",
+                step3: "tan(30°) = height / 50, so height = 50 * tan(30°)",
+                step4: "Calculate: 50 * (1/√3) = 28.87 meters",
+                proTip: "Remember that tan(30°) = 1/√3 ≈ 0.577"
+            },
             stem: "A surveyor wants to measure the height of a building using a theodolite. If the angle of elevation to the top of the building is 30° and the distance from the theodolite to the building is 50 meters, what is the height of the building?",
             choices: [
                 "25 meters",
@@ -1855,6 +1984,13 @@ function getFallbackQuestions() {
             section: "AMSTHEC",
             topic: "Calculus",
             difficulty: "hard",
+            solution: {
+                step1: "Identify the function as a polynomial: f(x) = 3x² + 5x - 2",
+                step2: "Apply the power rule: d/dx(x^n) = nx^(n-1)",
+                step3: "Differentiate each term: d/dx(3x²) = 6x, d/dx(5x) = 5, d/dx(-2) = 0",
+                step4: "Combine results: f'(x) = 6x + 5",
+                proTip: "Remember that the derivative of a constant is always 0"
+            },
             stem: "What is the derivative of f(x) = 3x² + 5x - 2?",
             choices: [
                 "6x + 5",
@@ -1870,6 +2006,13 @@ function getFallbackQuestions() {
             section: "HPGE",
             topic: "Soil Mechanics",
             difficulty: "medium",
+            solution: {
+                step1: "Understand the relationship between void ratio (e) and porosity (n)",
+                step2: "Use the formula: n = e / (1 + e)",
+                step3: "Substitute e = 0.6 into the formula",
+                step4: "Calculate: n = 0.6 / (1 + 0.6) = 0.6 / 1.6 = 0.375",
+                proTip: "Remember that porosity is always less than the void ratio"
+            },
             stem: "In a soil sample, the void ratio is 0.6 and the specific gravity of soil solids is 2.7. What is the porosity of the soil?",
             choices: [
                 "0.375",
@@ -1885,6 +2028,13 @@ function getFallbackQuestions() {
             section: "PSAD",
             topic: "Concrete Design",
             difficulty: "hard",
+            solution: {
+                step1: "Review building code requirements for minimum reinforcement",
+                step2: "Understand that minimum reinforcement is needed to ensure ductile behavior",
+                step3: "Recall the standard minimum reinforcement ratio for simply supported beams",
+                step4: "The minimum reinforcement ratio is typically 0.003 (0.3%)",
+                proTip: "This minimum ensures the beam fails in tension rather than brittle compression"
+            },
             stem: "What is the minimum reinforcement ratio for a simply supported reinforced concrete beam?",
             choices: [
                 "0.001",
