@@ -32,10 +32,20 @@ body {
     color: var(--text-light);
     line-height: 1.5;
     transition: background-color 0.3s, color 0.3s;
+    font-size: 1rem;
 }
 body.dark {
     background-color: var(--bg-dark);
     color: var(--text-dark);
+}
+body.font-small {
+    font-size: 0.875rem;
+}
+body.font-large {
+    font-size: 1.125rem;
+}
+body.nav-step {
+    overflow-x: hidden;
 }
 
 /* ===== UTILITY CLASSES ===== */
@@ -85,6 +95,12 @@ body.dark {
 }
 .whitespace-pre-wrap {
     white-space: pre-wrap;
+}
+.text-muted {
+    color: var(--text-muted-light);
+}
+.dark .text-muted {
+    color: var(--text-muted-dark);
 }
 
 /* ===== CARD COMPONENT ===== */
@@ -137,7 +153,7 @@ body.dark {
     background: #ddd6fe;
 }
 .dark .btn-secondary:hover:not(:disabled) {
-    background: #4b5563;
+    background: var(--border-dark);
 }
 .btn-danger {
     background: var(--danger-color);
@@ -703,36 +719,6 @@ body.dark {
     color: var(--success-color);
 }
 
-/* ===== BOOKMARKS SCREEN ===== */
-.bookmark-card {
-    padding: 1rem;
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius);
-    background: var(--bg-card-light);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    transition: box-shadow 0.1s;
-}
-.dark .bookmark-card {
-    border-color: var(--border-dark);
-    background: var(--bg-card-dark);
-}
-.bookmark-info {
-    flex-grow: 1;
-}
-.bookmark-section {
-    font-size: 0.75rem;
-    color: var(--text-muted-light);
-}
-.dark .bookmark-section {
-    color: var(--text-muted-dark);
-}
-.bookmark-stem {
-    font-weight: 600;
-    margin-top: 0.25rem;
-}
-
 /* ===== ANALYTICS SCREEN ===== */
 #overall-chart {
     max-height: 250px;
@@ -877,26 +863,6 @@ body.dark {
     gap: 1rem;
 }
 
-/* ===== FONT SIZES ===== */
-body.font-small {
-    font-size: 0.875rem;
-}
-body.font-small .header h1 {
-    font-size: 1.75rem;
-}
-body.font-small .timer {
-    font-size: 1.25rem;
-}
-body.font-large {
-    font-size: 1.125rem;
-}
-body.font-large .header h1 {
-    font-size: 2.25rem;
-}
-body.font-large .timer {
-    font-size: 1.75rem;
-}
-
 /* ===== PDF/PRINT STYLES ===== */
 .printable-container {
     padding: 0.5in;
@@ -980,4 +946,10 @@ body.font-large .timer {
   .printable-container {
     display: block !important;
   }
+}
+
+/* ===== ACCESSIBILITY ===== */
+:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
 }
