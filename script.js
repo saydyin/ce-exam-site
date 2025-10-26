@@ -1244,7 +1244,7 @@ function renderResultsScreen() {
                 choicesHtml += `
                     <div class="choice-btn ${bgClass} ${borderClass}">
                         <span class="choice-letter">${letter}.</span>
-                        <span>${choice}</span>
+                        <span>${choice.trim()}</span>
                     </div>
                 `;
             });
@@ -1842,104 +1842,98 @@ function renderSettingsScreen() {
 // PDF GENERATION
 // ======================
 function generateOfflinePDF() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('p', 'mm', 'letter');
-    let yPos = 20;
+    // Create a visual PDF container
+    const pdfContainer = document.getElementById('pdf-container');
+    pdfContainer.innerHTML = '';
     
-    // Add title
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Civil Engineering Exam Simulator', 105, yPos, { align: 'center' });
-    yPos += 15;
-    
-    // Add instructions
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text('This is a printable version of the exam simulator for offline use.', 20, yPos);
-    yPos += 8;
-    doc.text('You can use this to study or practice without internet connection.', 20, yPos);
-    yPos += 15;
+    // Add header
+    const header = document.createElement('div');
+    header.className = 'printable-header';
+    header.innerHTML = `
+        <h2 class="printable-title">Civil Engineering Exam Simulator</h2>
+        <p class="printable-subtitle">Printable version for offline study</p>
+        <p class="text-muted">This document contains all exam questions with figures and explanations for offline study</p>
+    `;
+    pdfContainer.appendChild(header);
     
     // Add sections
     Object.values(SECTIONS).forEach((section, sectionIndex) => {
-        // Section title
-        doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Section ${sectionIndex + 1}: ${section.title}`, 20, yPos);
-        yPos += 10;
+        const sectionContainer = document.createElement('div');
+        sectionContainer.className = 'printable-section';
+        sectionContainer.innerHTML = `<h3 class="printable-title">Section ${sectionIndex + 1}: ${section.title}</h3>`;
         
-        // Add questions
         const questions = getQuestionsForSection(section.name);
         questions.forEach((question, index) => {
-            if (yPos > 270) {
-                doc.addPage();
-                yPos = 20;
+            const questionContainer = document.createElement('div');
+            questionContainer.className = 'printable-question';
+            questionContainer.innerHTML = `
+                <h3>Question ${index + 1}</h3>
+                <div class="printable-stem">${question.stem}</div>
+            `;
+            
+            // Add figure if exists
+            if (question.figure) {
+                const figureContainer = document.createElement('div');
+                figureContainer.className = 'printable-figure';
+                figureContainer.innerHTML = `
+                    <img src="${question.figure}" alt="Figure for question ${index + 1}">
+                    <p>Figure ${index + 1}: ${question.figure_caption || ''}</p>
+                `;
+                questionContainer.appendChild(figureContainer);
             }
             
-            // Question number
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'bold');
-            doc.text(`Question ${index + 1}:`, 20, yPos);
-            yPos += 6;
+            // Add choices
+            const choicesContainer = document.createElement('div');
+            choicesContainer.className = 'printable-choices';
+            choicesContainer.innerHTML = '<p>Choices:</p>';
             
-            // Question stem - with proper HTML entity decoding
-            doc.setFontSize(11);
-            doc.setFont('helvetica', 'normal');
-            const decodedStem = decodeHtmlEntities(question.stem);
-            const stemLines = doc.splitTextToSize(decodedStem, 170);
-            doc.text(stemLines, 20, yPos);
-            yPos += stemLines.length * 5;
-            
-            // Choices
             question.choices.forEach((choice, choiceIndex) => {
-                if (yPos > 270) {
-                    doc.addPage();
-                    yPos = 20;
-                }
                 const letter = String.fromCharCode(65 + choiceIndex);
-                const decodedChoice = decodeHtmlEntities(choice);
-                doc.text(`${letter}. ${decodedChoice}`, 25, yPos);
-                yPos += 6;
+                const choiceDiv = document.createElement('div');
+                choiceDiv.className = 'printable-choice';
+                choiceDiv.innerHTML = `<span class="choice-letter">${letter}.</span> ${choice.trim()}`;
+                choicesContainer.appendChild(choiceDiv);
             });
             
-            // Add solution template for this question
-            if (question.solution) {
-                yPos += 10;
-                doc.setFontSize(12);
-                doc.setFont('helvetica', 'bold');
-                doc.text('Solution:', 20, yPos);
-                yPos += 6;
-                
-                // Step 1
-                doc.setFontSize(10);
-                doc.text('Step 1: ' + (question.solution.step1 || 'Understanding the problem'), 20, yPos);
-                yPos += 5;
-                
-                // Step 2
-                doc.text('Step 2: ' + (question.solution.step2 || 'Key formulas'), 20, yPos);
-                yPos += 5;
-                
-                // Step 3
-                doc.text('Step 3: ' + (question.solution.step3 || 'Calculation'), 20, yPos);
-                yPos += 5;
-                
-                // Step 4
-                doc.text('Step 4: ' + (question.solution.step4 || 'Final answer'), 20, yPos);
-                yPos += 5;
-                
-                // Pro Tip
-                doc.text('Pro Tip: ' + (question.solution.proTip || 'Additional insights'), 20, yPos);
-                yPos += 10;
+            questionContainer.appendChild(choicesContainer);
+            
+            // Add explanation if exists
+            if (question.explanation) {
+                const explanationContainer = document.createElement('div');
+                explanationContainer.className = 'printable-explanation';
+                explanationContainer.innerHTML = `
+                    <h4>Explanation:</h4>
+                    <p>${question.explanation}</p>
+                `;
+                questionContainer.appendChild(explanationContainer);
             }
             
-            yPos += 10;
+            sectionContainer.appendChild(questionContainer);
         });
         
-        yPos += 20;
+        pdfContainer.appendChild(sectionContainer);
     });
     
-    // Save PDF
-    doc.save('civil-engineering-exam.pdf');
+    // Add footer
+    const footer = document.createElement('div');
+    footer.className = 'printable-footer';
+    footer.innerHTML = `
+        <p>© ${new Date().getFullYear()} Civil Engineering Exam Simulator. All rights reserved.</p>
+        <p>Generated on: ${new Date().toLocaleString()}</p>
+        <p class="text-muted">This document is for personal study purposes only. Do not distribute.</p>
+    `;
+    pdfContainer.appendChild(footer);
+    
+    // Show the PDF container for print preview
+    pdfContainer.style.display = 'block';
+    
+    // Use the browser's native print dialog
+    window.print();
+    
+    // Hide the container again after printing
+    setTimeout(() => {
+        pdfContainer.style.display = 'none';
+    }, 1000);
 }
 
 // ======================
