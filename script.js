@@ -1084,10 +1084,11 @@ function generateOfflinePDF() {
             doc.text(`Question ${index + 1}:`, 20, yPos);
             yPos += 6;
             
-            // Question stem
+            // Question stem - with proper HTML entity decoding
             doc.setFontSize(11);
             doc.setFont('helvetica', 'normal');
-            const stemLines = doc.splitTextToSize(question.stem, 170);
+            const decodedStem = decodeHtmlEntities(question.stem);
+            const stemLines = doc.splitTextToSize(decodedStem, 170);
             doc.text(stemLines, 20, yPos);
             yPos += stemLines.length * 5;
             
@@ -1098,7 +1099,8 @@ function generateOfflinePDF() {
                     yPos = 20;
                 }
                 const letter = String.fromCharCode(65 + choiceIndex);
-                doc.text(`${letter}. ${choice}`, 25, yPos);
+                const decodedChoice = decodeHtmlEntities(choice);
+                doc.text(`${letter}. ${decodedChoice}`, 25, yPos);
                 yPos += 6;
             });
             
@@ -1113,10 +1115,18 @@ function generateOfflinePDF() {
 }
 
 // ======================
+// HTML DECODING UTILITY
+// ======================
+function decodeHtmlEntities(text) {
+    const tempElement = document.createElement('div');
+    tempElement.innerHTML = text;
+    return tempElement.textContent || tempElement.innerText || '';
+}
+
+// ======================
 // OTHER UTILITIES
 // ======================
 function startFullMockExam() {
-    // Implementation for full mock exam
     showConfirmModal(
         "Full Mock Exam",
         "Starting a full mock exam will combine all sections into one continuous exam. Are you sure you want to proceed?",
@@ -1221,9 +1231,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Close modal on image click
-    document.getElementById('close-image-modal').onclick = () => {
-        document.getElementById('image-modal').classList.add('hidden');
-    };
+    const closeImageModal = document.getElementById('close-image-modal');
+    if (closeImageModal) {
+        closeImageModal.onclick = () => {
+            document.getElementById('image-modal').classList.add('hidden');
+        };
+    }
     
     // Prevent default form submission
     document.querySelectorAll('form').forEach(form => {
