@@ -93,7 +93,7 @@ let appState = {
     questionTimes: JSON.parse(localStorage.getItem('examTimes')) || {},
     questionDifficulty: JSON.parse(localStorage.getItem('examDifficulty')) || {},
     performanceData: JSON.parse(localStorage.getItem('performanceData')) || {},
-    customExam: {
+    customExam: JSON.parse(localStorage.getItem('customExam')) || {
         sections: ['AMSTHEC', 'HPGE', 'PSAD'],
         randomize: true,
         difficulty: 'all',
@@ -118,7 +118,7 @@ async function loadQuestionBank() {
         // Add difficulty ratings to questions
         questionBank.forEach(q => {
             if (!q.difficulty) {
-                // Default difficulty based on section
+                // Default difficulty based on section (random placeholder logic)
                 if (q.section === 'AMSTHEC') q.difficulty = ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)];
                 else if (q.section === 'HPGE') q.difficulty = ['medium', 'hard', 'hard'][Math.floor(Math.random() * 3)];
                 else if (q.section === 'PSAD') q.difficulty = ['medium', 'medium', 'hard'][Math.floor(Math.random() * 3)];
@@ -129,6 +129,7 @@ async function loadQuestionBank() {
         return questionBank;
     } catch (error) {
         console.error('Error loading question bank:', error);
+        // Fallback for demonstration if question_bank.json fails
         appState.fullQuestionBank = getFallbackQuestions();
         return appState.fullQuestionBank;
     }
@@ -181,15 +182,16 @@ function processQuestionsWithGroups(questions) {
     
     // Process each group to ensure "Situation" questions are first
     const processedGroups = Object.values(groupMap).map(group => {
-        // Check if this is a valid situation group (should have 3 questions)
-        const isSituationGroup = group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3;
+        // A common CE situation group has a main Situation question followed by two or more related questions
+        // This simple check assumes a standard 3-question group with a "Situation" stem
+        const isSituationGroup = group.some(q => q.stem.trim().startsWith('Situation')) && group.length >= 2;
         
         if (isSituationGroup) {
-            // Sort the group to put Situation first
+            // Sort the group to put the Situation statement first, followed by the related questions
             return group.sort((a, b) => {
                 if (a.stem.trim().startsWith('Situation')) return -1;
                 if (b.stem.trim().startsWith('Situation')) return 1;
-                return 0;
+                return a.stem.localeCompare(b.stem); // Default sort for sub-questions
             });
         }
         
@@ -198,58 +200,49 @@ function processQuestionsWithGroups(questions) {
     });
     
     // Now we have all questions organized into groups
-    // We need to flatten the groups while preserving their internal order
     
     // First, separate into situation groups and standalone questions
     const situationGroups = [];
     const standaloneQuestions = [];
     
     processedGroups.forEach(group => {
-        if (group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3) {
+        if (group.some(q => q.stem.trim().startsWith('Situation')) && group.length >= 2) {
             situationGroups.push(group);
         } else {
             standaloneQuestions.push(...group);
         }
     });
     
-    // Randomize the situation groups and standalone questions
-    const randomizedSituationGroups = appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize) 
-        ? shuffleArray(situationGroups) 
-        : situationGroups;
-        
-    const randomizedStandalone = appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize) 
-        ? shuffleArray(standaloneQuestions) 
-        : standaloneQuestions;
+    // Determine randomization setting
+    const shouldRandomize = appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize);
     
-    // Create final question list with situation groups first
+    const randomizedSituationGroups = shouldRandomize ? shuffleArray(situationGroups) : situationGroups;
+        
+    const randomizedStandalone = shouldRandomize ? shuffleArray(standaloneQuestions) : standaloneQuestions;
+    
     let finalQuestions = [];
     
-    // Add situation groups
-    randomizedSituationGroups.forEach(group => {
-        finalQuestions.push(...group);
-    });
-    
-    // Add standalone questions
-    finalQuestions.push(...randomizedStandalone);
-    
-    // For better user experience, interleave situation groups with standalone questions
-    if (appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize)) {
-        finalQuestions = [];
-        
+    if (!shouldRandomize) {
+        // If not randomizing, just flatten the list
+        processedGroups.forEach(group => {
+            finalQuestions.push(...group);
+        });
+    } else {
+        // Interleave situation groups with standalone questions for a mixed exam experience
         const interleaved = [];
         let situationIndex = 0;
         let standaloneIndex = 0;
         
         // Alternate between situation groups and standalone questions
         while (situationIndex < randomizedSituationGroups.length || standaloneIndex < randomizedStandalone.length) {
-            // Add 1 situation group (3 questions)
+            // Add 1 situation group
             if (situationIndex < randomizedSituationGroups.length) {
                 interleaved.push(...randomizedSituationGroups[situationIndex]);
                 situationIndex++;
             }
             
-            // Add 1-2 standalone questions
-            const numStandalone = Math.min(2, randomizedStandalone.length - standaloneIndex);
+            // Add a chunk of standalone questions (e.g., 2-4 questions)
+            const numStandalone = Math.min(Math.floor(Math.random() * 3) + 2, randomizedStandalone.length - standaloneIndex);
             if (numStandalone > 0) {
                 for (let i = 0; i < numStandalone; i++) {
                     interleaved.push(randomizedStandalone[standaloneIndex + i]);
@@ -331,60 +324,46 @@ function loadQuestionsForSection(sectionName) {
     const savedKey = `examQuestions_${sectionName}`;
     const savedQuestions = localStorage.getItem(savedKey);
     let sectionQuestions;
-    if (savedQuestions) {
+    if (savedQuestions && appState.view !== 'custom-exam') {
         sectionQuestions = JSON.parse(savedQuestions);
     } else {
         sectionQuestions = getQuestionsForSection(sectionName);
         localStorage.setItem(savedKey, JSON.stringify(sectionQuestions));
     }
     appState.examQuestions = sectionQuestions;
+    
+    // Initialize state if necessary
     if (!appState.answers[sectionName]) {
         appState.answers[sectionName] = new Array(sectionQuestions.length).fill(null);
     }
-    if (!appState.isPaused) {
-        appState.timeLeft = SECTIONS[sectionName].time;
-    } else {
-        // Restore previous time if paused
-        const savedTime = localStorage.getItem(`examTime_${sectionName}`);
-        if (savedTime) {
-            appState.timeLeft = parseInt(savedTime);
-        }
-    }
-    
-    // Initialize question times
     if (!appState.questionTimes[sectionName]) {
         appState.questionTimes[sectionName] = new Array(sectionQuestions.length).fill(0);
     }
-    
-    // Initialize flagged questions
     if (!appState.flaggedQuestions[sectionName]) {
         appState.flaggedQuestions[sectionName] = new Array(sectionQuestions.length).fill(false);
     }
-    
-    // Initialize notes
     if (!appState.questionNotes[sectionName]) {
         appState.questionNotes[sectionName] = new Array(sectionQuestions.length).fill('');
     }
-    
-    // Initialize difficulty ratings
     if (!appState.questionDifficulty[sectionName]) {
         appState.questionDifficulty[sectionName] = new Array(sectionQuestions.length).fill('medium');
     }
-    
-    // Initialize performance data
     if (!appState.performanceData[sectionName]) {
         appState.performanceData[sectionName] = {
-            difficultyDistribution: {
-                easy: 0,
-                medium: 0,
-                hard: 0
-            },
+            difficultyDistribution: { easy: 0, medium: 0, hard: 0 },
             topicPerformance: {},
-            answerPatterns: {
-                commonMistakes: []
-            }
+            answerPatterns: { commonMistakes: [] }
         };
     }
+
+    if (appState.isPaused) {
+        // Restore previous time if paused
+        const savedTime = localStorage.getItem(`examTime_${sectionName}`);
+        appState.timeLeft = savedTime ? parseInt(savedTime) : SECTIONS[sectionName].time;
+    } else {
+        appState.timeLeft = SECTIONS[sectionName].time;
+    }
+
     
     if (document.getElementById('exam-timer')) {
         document.getElementById('exam-timer').textContent = formatTime(appState.timeLeft);
@@ -416,7 +395,6 @@ function startTimer() {
             const now = Date.now();
             const timeSpent = Math.floor((now - lastQuestionTime) / 1000);
             lastQuestionTime = now;
-            
             if (!appState.questionTimes[appState.currentSection]) {
                 appState.questionTimes[appState.currentSection] = new Array(appState.examQuestions.length).fill(0);
             }
@@ -433,15 +411,19 @@ function getCurrentQuestionIndex() {
             return parseInt(activeCard.id.split('-')[1]);
         }
     } else {
+        // Scroll Mode: find the card closest to the top of the viewport
         const questionCards = document.querySelectorAll('.question-card');
         if (questionCards.length > 0) {
             const firstVisible = Array.from(questionCards).find(card => {
                 const rect = card.getBoundingClientRect();
-                return rect.top >= 0 && rect.top <= window.innerHeight;
+                // Check if the top of the card is visible and near the top of the viewport
+                return rect.top >= 0 && rect.top <= window.innerHeight * 0.25; 
             });
             if (firstVisible) {
                 return parseInt(firstVisible.id.split('-')[1]);
             }
+            // If none are visible, return the index of the first question
+            return parseInt(questionCards[0].id.split('-')[1]);
         }
     }
     return -1;
@@ -451,7 +433,6 @@ function pauseTimer() {
     clearInterval(appState.timerInterval);
     appState.isPaused = true;
     saveState();
-    
     // Save remaining time for this section
     if (appState.currentSection) {
         localStorage.setItem(`examTime_${appState.currentSection}`, appState.timeLeft.toString());
@@ -482,22 +463,19 @@ function resetExam() {
         questionCount: 100,
         timeLimit: 4 * 60 * 60
     };
-    
     localStorage.removeItem('examAnswers');
     localStorage.removeItem('examResults');
-    localStorage.removeItem('examSettings');
+    // Note: Leaving examSettings as is, unless user explicitly resets settings
     localStorage.removeItem('examFlagged');
     localStorage.removeItem('examNotes');
     localStorage.removeItem('examTimes');
     localStorage.removeItem('examDifficulty');
     localStorage.removeItem('performanceData');
     localStorage.removeItem('customExam');
-    
     Object.keys(SECTIONS).forEach(sectionName => {
         localStorage.removeItem(`examQuestions_${sectionName}`);
         localStorage.removeItem(`examTime_${sectionName}`);
     });
-    
     showScreen('main-menu');
 }
 
@@ -509,55 +487,39 @@ function renderCustomExamBuilder() {
     document.getElementById('amsthec-include').checked = appState.customExam.sections.includes('AMSTHEC');
     document.getElementById('hpge-include').checked = appState.customExam.sections.includes('HPGE');
     document.getElementById('psad-include').checked = appState.customExam.sections.includes('PSAD');
-    
     document.getElementById('randomize-questions').checked = appState.customExam.randomize;
-    document.getElementById('include-timer').checked = true; // Always include timer for custom exams
     document.getElementById('difficulty-filter').value = appState.customExam.difficulty;
-    
     document.getElementById('question-count').value = appState.customExam.questionCount;
     document.getElementById('question-count-value').textContent = appState.customExam.questionCount;
-    
     const timeHours = Math.floor(appState.customExam.timeLimit / 3600);
     document.getElementById('time-limit').value = timeHours;
     document.getElementById('time-limit-value').textContent = `${timeHours} hours`;
-    
+
     // Set up event listeners
     document.getElementById('question-count').oninput = function() {
         document.getElementById('question-count-value').textContent = this.value;
         appState.customExam.questionCount = parseInt(this.value);
         saveState();
     };
-    
     document.getElementById('time-limit').oninput = function() {
         const hours = parseInt(this.value);
         document.getElementById('time-limit-value').textContent = `${hours} hours`;
         appState.customExam.timeLimit = hours * 3600;
         saveState();
     };
-    
     document.getElementById('difficulty-filter').onchange = function() {
         appState.customExam.difficulty = this.value;
         saveState();
     };
-    
     document.getElementById('randomize-questions').onchange = function() {
         appState.customExam.randomize = this.checked;
         saveState();
     };
-    
     // Section checkboxes
-    document.getElementById('amsthec-include').onchange = function() {
-        updateCustomExamSections();
-    };
-    
-    document.getElementById('hpge-include').onchange = function() {
-        updateCustomExamSections();
-    };
-    
-    document.getElementById('psad-include').onchange = function() {
-        updateCustomExamSections();
-    };
-    
+    document.getElementById('amsthec-include').onchange = function() { updateCustomExamSections(); };
+    document.getElementById('hpge-include').onchange = function() { updateCustomExamSections(); };
+    document.getElementById('psad-include').onchange = function() { updateCustomExamSections(); };
+
     // Button actions
     document.getElementById('btn-custom-exam-back').onclick = () => showScreen('main-menu');
     document.getElementById('btn-create-custom-exam').onclick = createCustomExam;
@@ -569,1502 +531,1082 @@ function updateCustomExamSections() {
     if (document.getElementById('hpge-include').checked) sections.push('HPGE');
     if (document.getElementById('psad-include').checked) sections.push('PSAD');
     
+    if (sections.length === 0) {
+        alert("You must select at least one section.");
+        // Re-check the last section to prevent an empty array
+        appState.customExam.sections.forEach(section => {
+            document.getElementById(`${section.toLowerCase()}-include`).checked = true;
+        });
+        return;
+    }
+
     appState.customExam.sections = sections;
     saveState();
 }
 
 function createCustomExam() {
     if (appState.customExam.sections.length === 0) {
-        alert('Please select at least one section for your custom exam.');
+        alert("Please select at least one section for the custom exam.");
         return;
     }
+
+    // Set up a temporary section object for the custom exam
+    const customSectionName = 'CUSTOM_EXAM';
+    SECTIONS[customSectionName] = {
+        name: customSectionName,
+        title: "Custom Mock Exam",
+        time: appState.customExam.timeLimit,
+        topics: ["Mixed Topics"],
+        // The total will be calculated later in startExam
+    };
     
-    // Create a combined exam from selected sections
-    let allQuestions = [];
-    let totalQuestions = 0;
-    
+    // Clear old custom exam questions
+    localStorage.removeItem(`examQuestions_${customSectionName}`);
+
+    // Create a new set of questions by combining filtered questions from selected sections
+    let combinedQuestions = [];
     appState.customExam.sections.forEach(sectionName => {
+        // Use the filter logic with the current custom exam settings
         const sectionQuestions = getQuestionsForSection(sectionName);
-        allQuestions = allQuestions.concat(sectionQuestions);
-        totalQuestions += sectionQuestions.length;
+        combinedQuestions.push(...sectionQuestions);
     });
+
+    // Randomize the final combined list if requested
+    if (appState.customExam.randomize) {
+        combinedQuestions = shuffleArray(combinedQuestions);
+    }
+
+    // Trim to the requested count
+    combinedQuestions = combinedQuestions.slice(0, appState.customExam.questionCount);
+
+    // Update the temporary section total
+    SECTIONS[customSectionName].total = combinedQuestions.length;
     
-    // Shuffle and limit to requested count
-    allQuestions = shuffleArray(allQuestions);
-    allQuestions = allQuestions.slice(0, appState.customExam.questionCount);
+    // Save this combined list as the "questions" for the custom section
+    localStorage.setItem(`examQuestions_${customSectionName}`, JSON.stringify(combinedQuestions));
+
+    // Clear old answers/state for the custom exam
+    appState.answers[customSectionName] = new Array(combinedQuestions.length).fill(null);
+    appState.questionTimes[customSectionName] = new Array(combinedQuestions.length).fill(0);
+    appState.flaggedQuestions[customSectionName] = new Array(combinedQuestions.length).fill(false);
+    appState.questionNotes[customSectionName] = new Array(combinedQuestions.length).fill('');
+    appState.questionDifficulty[customSectionName] = new Array(combinedQuestions.length).fill('medium');
     
-    // Set up exam state
-    appState.currentSection = 'CUSTOM';
-    appState.examQuestions = allQuestions;
-    appState.timeLeft = appState.customExam.timeLimit;
-    
-    // Initialize answer tracking
-    appState.answers.CUSTOM = new Array(allQuestions.length).fill(null);
-    appState.flaggedQuestions.CUSTOM = new Array(allQuestions.length).fill(false);
-    appState.questionNotes.CUSTOM = new Array(allQuestions.length).fill('');
-    appState.questionTimes.CUSTOM = new Array(allQuestions.length).fill(0);
-    
-    // Start the exam
-    saveState();
-    showScreen('exam');
-    startTimer();
+    // Set the state and move to instructions
+    appState.currentSection = customSectionName;
+    appState.isPaused = false;
+    showScreen('instructions');
 }
 
+
 // ======================
-// MAIN MENU
+// SCREEN RENDERING
 // ======================
 function renderMainMenu() {
-    const completedCount = Object.keys(appState.results).length;
-    document.getElementById('progress-text').textContent = `${completedCount}/3 sections completed`;
-    const grid = document.getElementById('section-grid');
-    grid.innerHTML = '';
-    Object.values(SECTIONS).forEach((section, idx) => {
-        const isCompleted = appState.results[section.name] !== undefined;
-        const isPaused = appState.isPaused && appState.currentSection === section.name;
-        const score = isCompleted ? appState.results[section.name].score_pct : null;
-        const card = document.createElement('div');
-        card.className = 'section-card';
+    const sectionGrid = document.getElementById('section-grid-container');
+    sectionGrid.innerHTML = '';
+    
+    let totalQuestions = 0;
+    let totalAnswered = 0;
+    let totalCorrect = 0;
+    
+    Object.keys(SECTIONS).forEach(key => {
+        const section = SECTIONS[key];
+        const answers = appState.answers[key];
+        const results = appState.results[key];
         
-        // Determine button text and class
-        let buttonText = '';
-        let buttonClass = '';
-        let timerDisplay = '';
+        const answeredCount = answers ? answers.filter(a => a !== null).length : 0;
+        const totalCount = section.total;
+        const progressPercentage = (answeredCount / totalCount) * 100;
+        const score = results ? results.score : null;
         
-        if (isCompleted) {
-            buttonText = 'Review Section';
-            buttonClass = 'btn-secondary';
-        } else if (isPaused) {
-            buttonText = 'Continue Section';
-            buttonClass = 'btn-primary';
-            const timeDisplay = formatTime(appState.timeLeft);
-            timerDisplay = `<p class="paused-timer" style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-muted-light)">⏳ Time left: ${timeDisplay}</p>`;
-        } else {
-            buttonText = 'Start Section';
-            buttonClass = 'btn-primary';
+        totalQuestions += totalCount;
+        totalAnswered += answeredCount;
+        if (score !== null) {
+            totalCorrect += score.correct;
         }
-        
-        card.innerHTML = `
-            <div class="section-card-header">
-                <h2 class="section-card-title">
-                    <span>${['📐','🗺️','📊'][idx % 3]}</span>
-                    ${section.name}
-                </h2>
-                ${isCompleted ? `<span class="section-card-score">${score.toFixed(1)}%</span>` : ''}
-            </div>
-            <p class="section-card-description">${section.title}</p>
-            ${timerDisplay}
-            <button type="button" class="btn ${buttonClass}" data-action="${isCompleted ? 'review' : (isPaused ? 'continue' : 'start')}" data-section="${section.name}">
-                ${buttonText}
-            </button>
-            ${isCompleted ? `
-                <div class="progress-container">
-                    <div class="progress-bar" style="width: ${score}%"></div>
+
+        const scoreText = score !== null 
+            ? `<span class="section-card-score">${score.correct} / ${score.total} (${(score.correct / score.total * 100).toFixed(0)}%)</span>`
+            : '';
+
+        const cardHtml = `
+            <div class="section-card">
+                <div class="section-card-header">
+                    <h2 class="section-card-title">
+                        ${section.title}
+                        ${results ? `<span class="feature-badge" style="background: ${results.isPassed ? 'var(--success-color)' : 'var(--danger-color)'};">
+                            ${results.isPassed ? 'PASSED' : 'FAILED'}
+                        </span>` : ''}
+                    </h2>
+                    ${scoreText}
                 </div>
-            ` : ''}
+                <p class="section-card-description">
+                    ${totalCount} Questions | ${formatTime(section.time)} Time Limit
+                </p>
+                
+                ${progressPercentage > 0 || score !== null ? `
+                <div class="progress-container">
+                    <div class="progress-bar" style="width: ${progressPercentage}%;"></div>
+                </div>
+                <p class="text-muted mt-2" style="font-size: 0.8rem;">
+                    ${answeredCount} / ${totalCount} Questions Answered
+                </p>` : `<p class="text-muted mt-2" style="font-size: 0.8rem;">Ready to start.</p>`}
+
+                <div class="flex gap-2 mt-4">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="startSection('${key}')">
+                        ${answeredCount > 0 && score === null ? 'Continue Exam' : 'Start Exam'}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="showReviewScreen('${key}')" ${score === null ? 'disabled' : ''}>
+                        Review
+                    </button>
+                </div>
+            </div>
         `;
-        
-        grid.appendChild(card);
+        sectionGrid.innerHTML += cardHtml;
     });
 
-    // Add event listeners
-    document.querySelectorAll('[data-action="start"], [data-action="continue"]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const sectionName = e.target.dataset.section;
-            appState.currentSection = sectionName;
-            showScreen('instructions');
-        });
-    });
-    
-    document.querySelectorAll('[data-action="review"]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const sectionName = e.target.dataset.section;
-            showReviewScreen(sectionName);
-        });
-    });
-    
-    // Set up other buttons
-    document.getElementById('btn-custom-exam').addEventListener('click', () => showScreen('custom-exam'));
-    document.getElementById('btn-settings').addEventListener('click', () => showScreen('settings'));
-    document.getElementById('btn-download-pdf').addEventListener('click', generateOfflinePDF);
-    document.getElementById('btn-reset').addEventListener('click', resetExam);
+    // Update overall progress text
+    const overallProgressText = document.getElementById('progress-text');
+    if (totalAnswered > 0 || Object.keys(appState.results).length > 0) {
+        const totalCompleted = Object.keys(appState.results).length;
+        overallProgressText.textContent = `Overall Progress: ${totalCompleted} / ${Object.keys(SECTIONS).length} Sections Completed.`;
+        if (totalCompleted === Object.keys(SECTIONS).length) {
+            document.getElementById('btn-start-full-exam').disabled = true;
+            document.getElementById('btn-view-results').disabled = false;
+        } else {
+            document.getElementById('btn-start-full-exam').disabled = false;
+            document.getElementById('btn-view-results').disabled = true;
+        }
+    } else {
+        overallProgressText.textContent = `Total Exam: ${totalQuestions} Questions.`;
+        document.getElementById('btn-start-full-exam').disabled = false;
+        document.getElementById('btn-view-results').disabled = true;
+    }
+
+    // Attach event listeners to main menu buttons
+    document.getElementById('btn-start-full-exam').onclick = startFullExam;
+    document.getElementById('btn-custom-exam').onclick = () => showScreen('custom-exam');
+    document.getElementById('btn-reset-data').onclick = resetExam;
+    document.getElementById('btn-settings').onclick = () => {
+        renderSettingsModal();
+        document.getElementById('settings-modal').classList.remove('hidden');
+    };
+    document.getElementById('btn-view-results').onclick = () => showScreen('results');
 }
 
-// ======================
-// INSTRUCTIONS SCREEN
-// ======================
+function startSection(sectionName) {
+    appState.currentSection = sectionName;
+    appState.isPaused = false;
+    // Clear any previous exam questions stored for this section to get a fresh start if the exam was completed or is a new custom one
+    if (appState.results[sectionName] && sectionName !== 'CUSTOM_EXAM') {
+        localStorage.removeItem(`examQuestions_${sectionName}`);
+        localStorage.removeItem(`examTime_${sectionName}`);
+    }
+    showScreen('instructions');
+}
+
+function startFullExam() {
+    // Only start a full exam if not all sections are complete
+    const completedCount = Object.keys(appState.results).length;
+    if (completedCount === Object.keys(SECTIONS).length) return;
+
+    // Find the next uncompleted section
+    const nextSectionKey = Object.keys(SECTIONS).find(key => !appState.results[key]);
+    if (nextSectionKey) {
+        startSection(nextSectionKey);
+    }
+}
+
 function renderInstructions() {
     const section = SECTIONS[appState.currentSection];
-    document.getElementById('instruction-section-title').textContent = section.title;
-    const instrList = document.getElementById('prc-instructions');
-    instrList.innerHTML = '';
-    [...PRC_INSTRUCTIONS,
-        `This section has <strong>${section.total} questions</strong>.`,
-        `You have <strong>${section.time / 3600} hours</strong> to complete this section.`
-    ].forEach(instr => {
-        const li = document.createElement('li');
-        li.innerHTML = instr;
-        instrList.appendChild(li);
-    });
-    const quote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
-    document.getElementById('motivational-quote').textContent = `"${quote}"`;
-    
-    // Set up button actions
-    document.getElementById('btn-instructions-back').onclick = () => showScreen('main-menu');
-    document.getElementById('btn-start-exam').onclick = () => {
-        if (!appState.isPaused) {
-            loadQuestionsForSection(appState.currentSection);
-        }
-        appState.isPaused = false;
-        showScreen('exam');
-        startTimer();
-    };
-}
+    if (!section) return;
 
-// ======================
-// EXAM SCREEN
-// ======================
-function renderExam() {
-    const section = appState.currentSection === 'CUSTOM' 
-        ? { title: 'Custom Exam' } 
-        : SECTIONS[appState.currentSection];
-    
-    const totalQuestions = appState.examQuestions.length;
-    document.getElementById('exam-section-title').textContent = section.title;
-    document.getElementById('exam-progress').textContent = `Question 1 of ${totalQuestions}`;
-    
-    // Apply theme and font size
-    document.body.className = `${appState.settings.theme} font-${appState.settings.fontSize} nav-${appState.settings.navigationMode}`;
-    
-    const container = document.getElementById('exam-questions-container');
-    container.innerHTML = '';
-    
-    // Render all questions
-    appState.examQuestions.forEach((question, index) => {
-        const userAnswer = appState.answers[appState.currentSection][index];
-        const isFlagged = appState.flaggedQuestions[appState.currentSection]?.[index] || false;
-        const timeSpent = appState.questionTimes[appState.currentSection]?.[index] || 0;
-        const formattedTime = timeSpent > 0 
-            ? `(${Math.floor(timeSpent / 60)}m ${timeSpent % 60}s)` 
-            : '';
-        const difficulty = appState.questionDifficulty[appState.currentSection]?.[index] || 'medium';
-        
-        const questionCard = document.createElement('div');
-        questionCard.className = `question-card ${isFlagged ? 'flagged-question' : ''}`;
-        questionCard.id = `question-${index}`;
-        if (appState.settings.navigationMode === 'step' && index === 0) {
-            questionCard.classList.add('active-question');
-        }
+    document.getElementById('instructions-section-title').textContent = section.title;
+    document.getElementById('instructions-section-subtitle').textContent = 
+        section.name === 'CUSTOM_EXAM' ? `Based on ${appState.customExam.sections.length} sections` : `Main Exam Component`;
 
-        questionCard.innerHTML = `
-            <div class="question-header">
-                <div>
-                    <p class="question-number">Question ${index + 1}${isFlagged ? '<span class="flagged-indicator"></span>' : ''}
-                        <span class="difficulty-badge difficulty-${difficulty}">${difficulty.charAt(0).toUpperCase()}</span>
-                    </p>
-                    <p class="time-spent">${formattedTime}</p>
-                    ${question.group_id && question.stem.trim().startsWith('Situation') ? `<p class="question-group">Situation: ${question.group_id}</p>` : (question.group_id ? `<p class="question-group">Problem from Situation ${question.group_id}</p>` : '')}
-                </div>
-            </div>
-            <p class="question-stem whitespace-pre-wrap">${question.stem}</p>
-            ${question.figure ? `<div class="question-image"><img src="${question.figure}" alt="Figure for question ${index + 1}" data-figure="${question.figure}"></div>` : ''}
-            <div class="choices-container">
-                ${question.choices.map((choice, choiceIndex) => {
-                    const letter = String.fromCharCode(65 + choiceIndex);
-                    const isSelected = userAnswer === letter;
-                    return `<button type="button" class="choice-btn ${isSelected ? 'selected' : ''}" data-question="${index}" data-choice="${letter}">
-                        <span class="choice-letter">${letter}.</span>
-                        <span>${choice.trim()}</span>
-                    </button>`;
-                }).join('')}
-            </div>
-            <div class="question-actions mt-4">
-                <button type="button" class="btn btn-secondary btn-sm toggle-flag" data-question="${index}">
-                    ${isFlagged ? 'Remove Flag' : 'Flag Question'}
-                </button>
-                <button type="button" class="btn btn-secondary btn-sm show-note" data-question="${index}">
-                    Add Note
-                </button>
-            </div>
-            <div class="note-container hidden" data-note="${index}">
-                <div class="note-header">
-                    <span>Notes</span>
-                    <button type="button" class="btn btn-sm btn-primary save-note" data-question="${index}">Save</button>
-                </div>
-                <textarea class="note-textarea" placeholder="Enter your notes here...">${appState.questionNotes[appState.currentSection]?.[index] || ''}</textarea>
-            </div>
-        `;
-        container.appendChild(questionCard);
-    });
+    // PRC Instructions
+    const instructionsList = document.getElementById('prc-instructions-list');
+    instructionsList.innerHTML = PRC_INSTRUCTIONS.map(item => `<li>${item}</li>`).join('');
 
-    // Add event listeners for choices
-    document.querySelectorAll('.choice-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const btnEl = e.target.closest('.choice-btn');
-            const questionIndex = parseInt(btnEl.dataset.question);
-            const choice = btnEl.dataset.choice;
-            selectAnswer(questionIndex, choice);
-            
-            // Visual feedback
-            const questionCard = document.getElementById(`question-${questionIndex}`);
-            questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => {
-                choiceBtn.classList.remove('selected');
-            });
-            btnEl.classList.add('selected');
-            
-            // Navigation
-            if (appState.settings.navigationMode === 'scroll') {
-                const nextIndex = questionIndex + 1;
-                if (nextIndex < totalQuestions) {
-                    const nextEl = document.getElementById(`question-${nextIndex}`);
-                    if (nextEl) {
-                        const header = document.querySelector('.exam-header');
-                        const headerHeight = header ? header.offsetHeight : 60;
-                        const elementPosition = nextEl.getBoundingClientRect().top + window.scrollY;
-                        const offsetPosition = elementPosition - headerHeight - 10;
-                        window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
-                    }
-                }
-            } else if (appState.settings.navigationMode === 'step') {
-                navigateStep(1);
-            }
-            
-            // Auto-save
-            if (appState.settings.autoSave) {
-                saveState();
-            }
-        });
-    });
+    // Motivational Quote
+    const quoteIndex = Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length);
+    document.getElementById('motivational-quote').textContent = `"${MOTIVATIONAL_QUOTES[quoteIndex]}"`;
 
-    // Add flagging functionality
-    document.querySelectorAll('.toggle-flag').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const questionIndex = parseInt(e.target.dataset.question);
-            const isFlagged = !appState.flaggedQuestions[appState.currentSection][questionIndex];
-            appState.flaggedQuestions[appState.currentSection][questionIndex] = isFlagged;
-            saveState();
-            
-            // Update UI
-            const questionCard = document.getElementById(`question-${questionIndex}`);
-            if (isFlagged) {
-                questionCard.classList.add('flagged-question');
-                questionCard.querySelector('.question-number').innerHTML = `Question ${questionIndex + 1}<span class="flagged-indicator"></span>
-                    <span class="difficulty-badge difficulty-${appState.questionDifficulty[appState.currentSection][questionIndex]}">${appState.questionDifficulty[appState.currentSection][questionIndex].charAt(0).toUpperCase()}</span>
-                `;
-                btn.textContent = 'Remove Flag';
-            } else {
-                questionCard.classList.remove('flagged-question');
-                questionCard.querySelector('.question-number').innerHTML = `Question ${questionIndex + 1}
-                    <span class="difficulty-badge difficulty-${appState.questionDifficulty[appState.currentSection][questionIndex]}">${appState.questionDifficulty[appState.currentSection][questionIndex].charAt(0).toUpperCase()}</span>
-                `;
-                btn.textContent = 'Flag Question';
-            }
-        });
-    });
-
-    // Add note-taking functionality
-    document.querySelectorAll('.show-note').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const questionIndex = parseInt(e.target.dataset.question);
-            const noteContainer = document.querySelector(`.note-container[data-note="${questionIndex}"]`);
-            noteContainer.classList.toggle('hidden');
-        });
-    });
-
-    document.querySelectorAll('.save-note').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const questionIndex = parseInt(e.target.dataset.question);
-            const textarea = document.querySelector(`.note-container[data-note="${questionIndex}"] textarea`);
-            const note = textarea.value;
-            
-            if (!appState.questionNotes[appState.currentSection]) {
-                appState.questionNotes[appState.currentSection] = new Array(appState.examQuestions.length).fill('');
-            }
-            appState.questionNotes[appState.currentSection][questionIndex] = note;
-            saveState();
-            
-            // Show confirmation
-            const btnText = btn.textContent;
-            btn.textContent = 'Saved!';
-            setTimeout(() => {
-                btn.textContent = btnText;
-            }, 1000);
-        });
-    });
-
-    // Add image zoom functionality
-    document.querySelectorAll('img[data-figure]').forEach(img => {
-        img.addEventListener('click', () => {
-            document.getElementById('zoomed-image').src = img.src;
-            document.getElementById('image-modal').classList.remove('hidden');
-        });
-    });
+    // Exam Details
+    document.getElementById('exam-details').innerHTML = `
+        <p><strong>Total Questions:</strong> ${section.total}</p>
+        <p><strong>Time Limit:</strong> ${formatTime(section.time)}</p>
+        <p><strong>Topics:</strong> ${section.topics.join(', ')}</p>
+    `;
 
     // Button actions
-    document.getElementById('btn-pause-resume').onclick = () => {
-        if (appState.isPaused) {
-            appState.isPaused = false;
-            startTimer();
-            document.getElementById('btn-pause-resume').innerHTML = `
-                <svg class="icon" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6"></path>
-                </svg> Pause
-            `;
-        } else {
-            pauseTimer();
-            document.getElementById('btn-pause-resume').innerHTML = `
-                <svg class="icon" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"></path>
-                </svg> Resume
-            `;
-        }
+    document.getElementById('btn-start-exam').onclick = () => {
+        loadQuestionsForSection(appState.currentSection);
+        showScreen('exam');
     };
+    document.getElementById('btn-back-to-menu').onclick = () => showScreen('main-menu');
+}
 
+function renderExam() {
+    const section = SECTIONS[appState.currentSection];
+    if (!section || appState.examQuestions.length === 0) {
+        showScreen('main-menu');
+        return;
+    }
+
+    // Header info
+    document.getElementById('exam-header-title').textContent = section.title;
+    const answeredCount = appState.answers[appState.currentSection].filter(a => a !== null).length;
+    document.getElementById('exam-header-subtitle').textContent = `Question 1 of ${appState.examQuestions.length} | Answered: ${answeredCount}`;
+    
+    // Timer visibility
+    document.getElementById('exam-timer').classList.toggle('hidden', !appState.settings.showTimer);
+
+    // Render questions
+    const questionsContainer = document.querySelector('#screen-exam .questions-container');
+    questionsContainer.innerHTML = appState.examQuestions.map((question, index) => renderQuestion(question, index)).join('');
+    
+    // Attach event listeners to newly rendered elements
+    attachExamEventListeners();
+
+    // Setup navigation for step mode
+    if (appState.settings.navigationMode === 'step') {
+        goToQuestion(0);
+    }
+
+    // Setup submit button visibility
+    document.getElementById('btn-submit-exam').classList.remove('hidden');
     document.getElementById('btn-submit-exam').onclick = () => {
-        showConfirmModal(
-            "Confirm Submission",
-            "Are you sure you want to submit this exam section? You won't be able to change your answers after submission.",
+        confirmAction(
+            'Submit Exam?',
+            'Are you sure you want to submit your answers? You cannot change them after submission.',
             submitExam
         );
     };
 
+    // Pause button
+    document.getElementById('btn-pause-exam').onclick = () => {
+        confirmAction(
+            'Pause Exam?',
+            'Are you sure you want to pause? The remaining time will be saved.',
+            pauseExamAndReturnToMenu
+        );
+    };
+
+    // Jump to first unanswered
     document.getElementById('btn-jump-to-first').onclick = jumpToFirstUnanswered;
 
-    document.getElementById('btn-nav-next').onclick = () => {
-        navigateStep(1);
-    };
-
-    // Keyboard navigation for step mode
-    if (appState.settings.navigationMode === 'step') {
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowRight') {
-                navigateStep(1);
-            } else if (e.key === 'ArrowLeft') {
-                navigateStep(-1);
-            } else if (e.key === 'f' || e.key === 'F') {
-                // Flag current question (F key)
-                const activeCard = document.querySelector('.question-card.active-question');
-                if (activeCard) {
-                    const index = parseInt(activeCard.id.split('-')[1]);
-                    const flagBtn = activeCard.querySelector('.toggle-flag');
-                    if (flagBtn) flagBtn.click();
-                }
-            }
-        });
+    // Initial scroll position
+    if (appState.settings.navigationMode === 'scroll') {
+        const lastIndex = getLastAnsweredIndex();
+        if (lastIndex !== -1) {
+            setTimeout(() => {
+                document.getElementById(`question-${lastIndex}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
     }
 }
 
-function selectAnswer(questionIndex, choice) {
-    if (appState.currentSection === null) return;
-    appState.answers[appState.currentSection][questionIndex] = choice;
-    if (appState.settings.autoSave) {
+function renderQuestion(question, index) {
+    const sectionName = appState.currentSection;
+    const answered = appState.answers[sectionName][index];
+    const isFlagged = appState.flaggedQuestions[sectionName][index];
+    const difficulty = appState.settings.showDifficulty ? 
+        `<span class="feature-badge" style="background: ${getDifficultyColor(question.difficulty)};">${question.difficulty.toUpperCase()}</span>` : '';
+    
+    // Check if the question is the beginning of a group
+    let groupHeader = '';
+    if (question.group_id && (index === 0 || question.group_id !== appState.examQuestions[index - 1].group_id)) {
+        groupHeader = `
+            <div class="card mb-4 p-4" style="background: var(--secondary-color);">
+                <p class="question-group" style="font-size: 1.125rem; font-weight: 600;">Situation</p>
+                <p class="question-stem">${question.stem}</p>
+                ${question.image ? `<div class="question-image">
+                    <img src="${question.image}" alt="Figure for Question ${index + 1}" data-src="${question.image}" />
+                </div>` : ''}
+            </div>
+        `;
+        // If it's a group, the first question is the Situation, so we use the next question's stem for the body
+        question.stem = appState.examQuestions[index + 1] && appState.examQuestions[index + 1].group_id === question.group_id
+            ? appState.examQuestions[index + 1].stem
+            : '';
+    } else if (question.group_id && index > 0 && question.group_id === appState.examQuestions[index - 1].group_id) {
+        // Hide actual stem if it's the second or third question in a group
+        // Use a placeholder number from the Situation statement instead
+    }
+    
+    // Only display question number if not the start of a group (Situation questions use the group header)
+    const displayIndex = groupHeader ? index + 1 : index + 1;
+
+    const stemContent = groupHeader ? '' : question.stem;
+
+    // Choice letters A, B, C, D
+    const choiceLetters = ['A', 'B', 'C', 'D'];
+    
+    const choicesHtml = question.choices.map((choice, choiceIndex) => {
+        const isSelected = choiceIndex === answered;
+        const className = isSelected ? 'selected' : '';
+        return `
+            <button type="button" class="choice-btn ${className}" 
+                data-question-index="${index}" 
+                data-choice-index="${choiceIndex}">
+                <span class="choice-letter">${choiceLetters[choiceIndex]}</span>
+                <span class="choice-text">${choice.text}</span>
+            </button>
+        `;
+    }).join('');
+
+    return `
+        ${groupHeader}
+        <div class="question-card ${answered !== null ? 'answered' : ''} ${isFlagged ? 'flagged' : ''}" id="question-${index}" data-index="${index}">
+            <div class="question-header">
+                <span class="question-number">Question ${displayIndex} ${difficulty}</span>
+                <button type="button" class="btn btn-text btn-sm toggle-notes" data-question-index="${index}">
+                    <svg class="icon" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                    </svg>
+                    Notes
+                </button>
+            </div>
+            ${groupHeader ? '' : `<p class="question-stem">${stemContent}</p>`}
+            ${question.image && !groupHeader ? `<div class="question-image">
+                <img src="${question.image}" alt="Figure for Question ${index + 1}" data-src="${question.image}" />
+            </div>` : ''}
+            
+            <div class="choices-container">
+                ${choicesHtml}
+            </div>
+
+            <div class="note-container hidden" data-note="${index}">
+                <div class="note-header">
+                    <label for="note-textarea-${index}" style="font-weight: 600;">Notes for Q${index + 1}</label>
+                    <button type="button" class="btn btn-sm btn-primary save-note" data-question="${index}">Save</button>
+                </div>
+                <textarea id="note-textarea-${index}" class="note-textarea" placeholder="Enter your notes here...">${appState.questionNotes[sectionName]?.[index] || ''}</textarea>
+            </div>
+        </div>
+    `;
+}
+
+function attachExamEventListeners() {
+    // Choice buttons
+    document.querySelectorAll('.choice-btn').forEach(button => {
+        button.addEventListener('click', handleAnswerSelection);
+    });
+
+    // Image zoom
+    document.querySelectorAll('.question-image img').forEach(img => {
+        img.addEventListener('click', handleImageZoom);
+    });
+    
+    // Notes toggle
+    document.querySelectorAll('.toggle-notes').forEach(button => {
+        button.addEventListener('click', handleNotesToggle);
+    });
+
+    // Save notes
+    document.querySelectorAll('.save-note').forEach(button => {
+        button.addEventListener('click', handleSaveNote);
+    });
+
+    // Flag button
+    document.getElementById('btn-flag-question').onclick = handleFlagToggle;
+
+    // Navigation buttons (for step mode)
+    document.getElementById('btn-previous-question').onclick = () => navigateQuestion(-1);
+    document.getElementById('btn-next-question').onclick = () => navigateQuestion(1);
+    
+    // Scroll listener for updating header subtitle in scroll mode
+    if (appState.settings.navigationMode === 'scroll') {
+        document.querySelector('#exam-content').addEventListener('scroll', updateExamHeader);
+    }
+}
+
+function handleAnswerSelection(event) {
+    const button = event.currentTarget;
+    const questionIndex = parseInt(button.dataset.questionIndex);
+    const choiceIndex = parseInt(button.dataset.choiceIndex);
+    const sectionName = appState.currentSection;
+    
+    // Clear previous selection
+    document.querySelectorAll(`.choice-btn[data-question-index="${questionIndex}"]`).forEach(btn => {
+        btn.classList.remove('selected');
+    });
+
+    // Set new selection
+    button.classList.add('selected');
+    appState.answers[sectionName][questionIndex] = choiceIndex;
+    
+    // Mark question as answered
+    document.getElementById(`question-${questionIndex}`).classList.add('answered');
+
+    if (appState.autoSaveEnabled) {
         saveState();
     }
+    updateExamHeader();
+
+    // Auto-advance in step mode
+    if (appState.settings.navigationMode === 'step') {
+        setTimeout(() => navigateQuestion(1), 200);
+    }
 }
 
-function navigateStep(direction) {
-    const activeCard = document.querySelector('.question-card.active-question');
-    if (!activeCard) return;
+function handleImageZoom(event) {
+    const imgElement = event.currentTarget;
+    const src = imgElement.dataset.src;
     
-    let currentIndex = parseInt(activeCard.id.split('-')[1]);
-    let nextIndex = currentIndex + direction;
+    document.getElementById('modal-image').src = src;
+    document.getElementById('image-modal').classList.remove('hidden');
+}
+
+function handleNotesToggle(event) {
+    const questionIndex = event.currentTarget.dataset.questionIndex;
+    const noteContainer = document.querySelector(`.note-container[data-note="${questionIndex}"]`);
+    noteContainer.classList.toggle('hidden');
+}
+
+function handleSaveNote(event) {
+    const questionIndex = event.currentTarget.dataset.question;
+    const sectionName = appState.currentSection;
+    const textarea = document.getElementById(`note-textarea-${questionIndex}`);
     
-    if (nextIndex >= 0 && nextIndex < appState.examQuestions.length) {
-        activeCard.classList.remove('active-question');
-        const nextCard = document.getElementById(`question-${nextIndex}`);
-        if (nextCard) {
-            nextCard.classList.add('active-question');
-            document.getElementById('exam-progress').textContent = `Question ${nextIndex + 1} of ${appState.examQuestions.length}`;
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    } else if (nextIndex >= appState.examQuestions.length) {
-        showConfirmModal(
-            "Section Completed",
-            "You have reached the end of the section. Do you want to submit your exam now?",
-            submitExam
-        );
+    appState.questionNotes[sectionName][questionIndex] = textarea.value;
+    saveState();
+    
+    // Simple visual feedback
+    const saveButton = event.currentTarget;
+    saveButton.textContent = 'Saved!';
+    setTimeout(() => {
+        saveButton.textContent = 'Save';
+    }, 1000);
+}
+
+function handleFlagToggle() {
+    const currentQuestionIndex = appState.settings.navigationMode === 'step' 
+        ? parseInt(document.querySelector('.question-card.active-question').dataset.index)
+        : getLastAnsweredIndex(); // Flag the question closest to view in scroll mode
+
+    if (currentQuestionIndex === -1) return;
+
+    const sectionName = appState.currentSection;
+    const isFlagged = appState.flaggedQuestions[sectionName][currentQuestionIndex];
+    
+    appState.flaggedQuestions[sectionName][currentQuestionIndex] = !isFlagged;
+    document.getElementById(`question-${currentQuestionIndex}`).classList.toggle('flagged', !isFlagged);
+    
+    // Update button text/icon
+    const flagButton = document.getElementById('btn-flag-question');
+    if (!isFlagged) {
+        flagButton.classList.add('btn-warning');
+        flagButton.classList.remove('btn-secondary');
+        flagButton.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M18 10V6a2 2 0 00-2-2H8a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-4m-6-4h4m-4 0v4m0-4l4-4"></path></svg> Unflag`;
+    } else {
+        flagButton.classList.remove('btn-warning');
+        flagButton.classList.add('btn-secondary');
+        flagButton.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M18 10V6a2 2 0 00-2-2H8a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-4m-6-4h4m-4 0v4m0-4l4-4"></path></svg> Flag`;
     }
+
+    saveState();
+}
+
+function updateExamHeader() {
+    const section = SECTIONS[appState.currentSection];
+    if (!section) return;
+
+    const answers = appState.answers[appState.currentSection];
+    const answeredCount = answers.filter(a => a !== null).length;
+    const totalCount = appState.examQuestions.length;
+
+    // Update progress text
+    let currentQ = 1;
+    if (appState.settings.navigationMode === 'step') {
+        const activeCard = document.querySelector('.question-card.active-question');
+        if (activeCard) {
+            currentQ = parseInt(activeCard.dataset.index) + 1;
+        }
+    } else {
+        const currentQuestionIndex = getCurrentQuestionIndex();
+        if (currentQuestionIndex !== -1) {
+             currentQ = currentQuestionIndex + 1;
+        }
+    }
+    
+
+    const progressText = appState.settings.showProgress 
+        ? `Question ${currentQ} of ${totalCount} | Answered: ${answeredCount}`
+        : `Answered: ${answeredCount} of ${totalCount}`;
+        
+    document.getElementById('exam-header-subtitle').textContent = progressText;
+
+    // Update flag button status for the current question
+    const currentQuestionIndex = getCurrentQuestionIndex();
+    const isFlagged = currentQuestionIndex !== -1 && appState.flaggedQuestions[appState.currentSection][currentQuestionIndex];
+    const flagButton = document.getElementById('btn-flag-question');
+    if (isFlagged) {
+        flagButton.classList.add('btn-warning');
+        flagButton.classList.remove('btn-secondary');
+        flagButton.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M18 10V6a2 2 0 00-2-2H8a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-4m-6-4h4m-4 0v4m0-4l4-4"></path></svg> Unflag`;
+    } else {
+        flagButton.classList.remove('btn-warning');
+        flagButton.classList.add('btn-secondary');
+        flagButton.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18M18 10V6a2 2 0 00-2-2H8a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2v-4m-6-4h4m-4 0v4m0-4l4-4"></path></svg> Flag`;
+    }
+}
+
+function getLastAnsweredIndex() {
+    const answers = appState.answers[appState.currentSection];
+    for (let i = answers.length - 1; i >= 0; i--) {
+        if (answers[i] !== null) {
+            return i;
+        }
+    }
+    return 0; // Default to first question
 }
 
 function jumpToFirstUnanswered() {
-    const sectionName = appState.currentSection;
-    const answers = appState.answers[sectionName];
-    const firstUnansweredIndex = answers.findIndex(answer => answer === null);
+    const answers = appState.answers[appState.currentSection];
+    const firstUnanswered = answers.findIndex(a => a === null);
     
-    if (firstUnansweredIndex === -1) {
-        alert("All questions have been answered!");
-        return;
-    }
-    
-    const targetEl = document.getElementById(`question-${firstUnansweredIndex}`);
-    if (targetEl) {
-        const header = document.querySelector('.exam-header');
-        const headerHeight = header ? header.offsetHeight : 60;
-        const elementPosition = targetEl.getBoundingClientRect().top + window.scrollY;
-        const offsetPosition = elementPosition - headerHeight - 10;
-        window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+    if (firstUnanswered !== -1) {
+        if (appState.settings.navigationMode === 'step') {
+            goToQuestion(firstUnanswered);
+        } else {
+            document.getElementById(`question-${firstUnanswered}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
 }
 
+// Step Navigation Functions
+function goToQuestion(index) {
+    const total = appState.examQuestions.length;
+    if (index < 0 || index >= total) return;
+    
+    document.querySelectorAll('.question-card').forEach(card => card.classList.remove('active-question'));
+    document.getElementById(`question-${index}`).classList.add('active-question');
+
+    // Scroll to the top of the exam content
+    document.querySelector('#exam-content').scrollTop = 0;
+    
+    // Update navigation buttons visibility
+    document.getElementById('btn-previous-question').classList.toggle('hidden', index === 0);
+    document.getElementById('btn-next-question').classList.toggle('hidden', index === total - 1);
+
+    updateExamHeader();
+}
+
+function navigateQuestion(direction) {
+    const activeCard = document.querySelector('.question-card.active-question');
+    if (!activeCard) return;
+
+    const currentIndex = parseInt(activeCard.dataset.index);
+    const newIndex = currentIndex + direction;
+
+    goToQuestion(newIndex);
+}
+
+function pauseExamAndReturnToMenu() {
+    pauseTimer();
+    appState.isPaused = true;
+    showScreen('main-menu');
+}
+
 // ======================
-// SUBMIT EXAM
+// SUBMISSION & RESULTS
 // ======================
 function submitExam() {
-    clearInterval(appState.timerInterval);
     const sectionName = appState.currentSection;
     const questions = appState.examQuestions;
     const answers = appState.answers[sectionName];
     
-    let correctCount = 0;
-    const wrongAnswers = [];
-    const topicPerformance = {};
-    
-    // Initialize topic performance tracking
-    const section = sectionName === 'CUSTOM' ? { topics: [] } : SECTIONS[sectionName];
-    if (section.topics) {
-        section.topics.forEach(topic => {
-            topicPerformance[topic] = {
-                total: 0,
-                correct: 0
-            };
-        });
-    }
-    
+    let correct = 0;
+    let wrong = 0;
+    let unanswered = 0;
+    let total = questions.length;
+    let firstWrong = -1;
+    let performanceData = {
+        difficultyDistribution: { easy: { correct: 0, total: 0 }, medium: { correct: 0, total: 0 }, hard: { correct: 0, total: 0 } },
+        topicPerformance: {}
+    };
+
     questions.forEach((question, index) => {
-        const userAnswer = answers[index];
-        const isCorrect = userAnswer === question.correct_answer;
+        const isCorrect = answers[index] === question.answer;
         
-        // Track topic performance
-        if (section.topics && question.topic && topicPerformance[question.topic]) {
-            topicPerformance[question.topic].total++;
-            if (isCorrect) topicPerformance[question.topic].correct++;
-        }
-        
-        if (isCorrect) {
-            correctCount++;
+        if (answers[index] === null) {
+            unanswered++;
+        } else if (isCorrect) {
+            correct++;
         } else {
-            wrongAnswers.push({
-                number: index + 1,
-                stem: question.stem,
-                user_answer: userAnswer,
-                correct_answer: question.correct_answer,
-                choices: question.choices,
-                explanation: question.explanation,
-                figure: question.figure,
-                group_id: question.group_id,
-                time_spent: appState.questionTimes[sectionName][index],
-                flagged: appState.flaggedQuestions[sectionName][index],
-                notes: appState.questionNotes[sectionName][index],
-                difficulty: appState.questionDifficulty[sectionName][index],
-                topic: question.topic
-            });
+            wrong++;
+            if (firstWrong === -1) {
+                firstWrong = index;
+            }
         }
-        
-        // Track performance data for future analysis
-        if (!appState.performanceData[sectionName]) {
-            appState.performanceData[sectionName] = {
-                difficultyDistribution: {
-                    easy: 0,
-                    medium: 0,
-                    hard: 0
-                },
-                topicPerformance: {},
-                answerPatterns: {
-                    commonMistakes: []
-                }
-            };
-        }
-        
+
+        // Update performance data
         const difficulty = question.difficulty || 'medium';
-        appState.performanceData[sectionName].difficultyDistribution[difficulty]++;
+        performanceData.difficultyDistribution[difficulty].total++;
+        if (isCorrect) {
+            performanceData.difficultyDistribution[difficulty].correct++;
+        }
         
-        if (question.topic) {
-            if (!appState.performanceData[sectionName].topicPerformance[question.topic]) {
-                appState.performanceData[sectionName].topicPerformance[question.topic] = {
-                    total: 0,
-                    correct: 0
-                };
-            }
-            appState.performanceData[sectionName].topicPerformance[question.topic].total++;
-            if (isCorrect) {
-                appState.performanceData[sectionName].topicPerformance[question.topic].correct++;
-            }
+        const topic = question.topic || 'General';
+        if (!performanceData.topicPerformance[topic]) {
+            performanceData.topicPerformance[topic] = { correct: 0, total: 0 };
+        }
+        performanceData.topicPerformance[topic].total++;
+        if (isCorrect) {
+            performanceData.topicPerformance[topic].correct++;
         }
     });
 
-    // Calculate answer patterns
-    const answerPatterns = analyzeAnswerPatterns(questions, answers);
+    const finalScore = (correct / total) * 100;
+    const isPassed = finalScore >= 70; // Assuming a 70% passing rate
     
-    if (wrongAnswers.length > 0) {
-        appState.firstWrongIndex = wrongAnswers[0].number - 1;
-    } else {
-        appState.firstWrongIndex = null;
-    }
-
-    const score_pct = (correctCount / questions.length) * 100;
     appState.results[sectionName] = {
-        score_pct,
-        correct: correctCount,
-        total: questions.length,
-        wrong: wrongAnswers,
-        timestamp: new Date().toISOString(),
-        topicPerformance: topicPerformance,
-        answerPatterns: answerPatterns
+        score: { correct, wrong, unanswered, total, percentage: finalScore.toFixed(2) },
+        isPassed: isPassed,
+        submissionTime: new Date().toISOString(),
+        timeTaken: SECTIONS[sectionName].time - appState.timeLeft,
+        firstWrongIndex: firstWrong,
+        questionOrder: questions.map(q => q.id), // Save the order of questions used
+        answers: [...answers], // Save the submitted answers
     };
-    
-    appState.isPaused = false;
+
+    appState.performanceData[sectionName] = performanceData;
+    appState.currentSection = sectionName; // Ensure currentSection is set for state
+    clearInterval(appState.timerInterval);
+    localStorage.removeItem(`examTime_${sectionName}`); // Clear saved time
     saveState();
     showScreen('results');
 }
 
-// ======================
-// ANSWER PATTERN ANALYSIS
-// ======================
-function analyzeAnswerPatterns(questions, answers) {
-    const patterns = {
-        commonMistakes: [],
-        streakAnalysis: [],
-        timeAnalysis: {
-            timePerQuestion: {
-                easy: { min: 0, max: 0, avg: 0 },
-                medium: { min: 0, max: 0, avg: 0 },
-                hard: { min: 0, max: 0, avg: 0 }
-            },
-            timeToCorrect: 0,
-            timeToWrong: 0
-        },
-        topicPerformance: {}
-    };
-    
-    // Analyze common mistakes
-    const mistakeMap = {};
-    questions.forEach((q, index) => {
-        const userAnswer = answers[index];
-        if (userAnswer !== null && userAnswer !== q.correct_answer) {
-            const mistakeKey = `${q.id}-${userAnswer}`;
-            if (!mistakeMap[mistakeKey]) {
-                mistakeMap[mistakeKey] = {
-                    count: 0,
-                    question: q,
-                    userAnswer: userAnswer
-                };
-            }
-            mistakeMap[mistakeKey].count++;
-        }
-    });
-    
-    // Get top 3 common mistakes
-    const mistakesArray = Object.values(mistakeMap).sort((a, b) => b.count - a.count).slice(0, 3);
-    mistakesArray.forEach(mistake => {
-        patterns.commonMistakes.push({
-            question: mistake.question,
-            userAnswer: mistake.userAnswer,
-            correctAnswer: mistake.question.correct_answer,
-            count: mistake.count
-        });
-    });
-    
-    // Analyze streaks
-    let currentStreak = 0;
-    let maxStreak = 0;
-    let currentStreakType = null;
-    
-    questions.forEach((q, index) => {
-        const isCorrect = answers[index] === q.correct_answer;
-        if (isCorrect) {
-            if (currentStreakType === 'correct') {
-                currentStreak++;
-            } else {
-                if (currentStreak > maxStreak && currentStreakType === 'correct') {
-                    maxStreak = currentStreak;
-                }
-                currentStreak = 1;
-                currentStreakType = 'correct';
-            }
-        } else {
-            if (currentStreakType === 'wrong') {
-                currentStreak++;
-            } else {
-                if (currentStreak > maxStreak && currentStreakType === 'wrong') {
-                    maxStreak = currentStreak;
-                }
-                currentStreak = 1;
-                currentStreakType = 'wrong';
-            }
-        }
-    });
-    
-    patterns.streakAnalysis.push({
-        maxCorrectStreak: maxStreak,
-        maxWrongStreak: maxStreak
-    });
-    
-    return patterns;
-}
-
-// ======================
-// RESULTS SCREEN
-// ======================
 function renderResultsScreen() {
     const sectionName = appState.currentSection;
-    const result = appState.results[sectionName];
-    const section = sectionName === 'CUSTOM' 
-        ? { title: 'Custom Exam' } 
-        : SECTIONS[sectionName];
-    const passed = result.score_pct >= 70;
-    
-    // Update results elements
-    document.getElementById('results-section-title').textContent = section.title;
-    document.getElementById('score-message').textContent = passed 
-        ? 'Congratulations! You Passed!' 
-        : 'Review Required. You Did Not Pass.';
-    
-    document.getElementById('results-score').className = `score ${passed ? 'pass' : 'fail'}`;
-    document.getElementById('results-score').textContent = `${result.score_pct.toFixed(1)}%`;
-    
-    document.getElementById('total-questions').textContent = result.total;
-    document.getElementById('correct-answers').textContent = result.correct;
-    document.getElementById('wrong-answers').textContent = result.total - result.correct;
-    
-    // Show/hide wrong answers section
-    const wrongAnswersSection = document.getElementById('wrong-answers-section');
-    if (result.wrong.length > 0) {
-        wrongAnswersSection.classList.remove('hidden');
-        const wrongAnswersList = document.getElementById('wrong-answers-list');
-        wrongAnswersList.innerHTML = '';
-        
-        result.wrong.forEach(wrong => {
-            let choicesHtml = '';
-            wrong.choices.forEach((choice, index) => {
-                const letter = String.fromCharCode(65 + index);
-                const isCorrect = letter === wrong.correct_answer;
-                const isUser = letter === wrong.user_answer && !isCorrect;
-                const bgClass = isCorrect ? 'bg-green-100' : (isUser ? 'bg-red-100' : '');
-                const borderClass = isCorrect ? 'border-green-500' : (isUser ? 'border-red-500' : 'border-gray-200');
-                
-                choicesHtml += `
-                    <div class="choice-btn ${bgClass} ${borderClass}">
-                        <span class="choice-letter">${letter}.</span>
-                        <span>${choice.trim()}</span>
-                    </div>
-                `;
-            });
-            
-            const wrongCard = document.createElement('div');
-            wrongCard.className = 'wrong-answer-card';
-            wrongCard.innerHTML = `
-                <div class="question-header">
-                    <p class="question-number">Question ${wrong.number}</p>
-                    ${wrong.group_id ? `<p class="question-group">Problem from Situation ${wrong.group_id}</p>` : ''}
-                </div>
-                <p class="question-stem whitespace-pre-wrap">${wrong.stem}</p>
-                ${wrong.figure ? `<div class="question-image"><img src="${wrong.figure}" alt="Figure for question ${wrong.number}" data-figure="${wrong.figure}"></div>` : ''}
-                <div class="choices-container">${choicesHtml}</div>
-                <div class="answer-comparison">
-                    <p class="user-answer">Your Answer: ${wrong.user_answer || "Not Answered"}</p>
-                    <p class="correct-answer">Correct Answer: ${wrong.correct_answer}</p>
-                    ${wrong.explanation ? `<div class="explanation"><p class="explanation-title">Explanation:</p><p class="whitespace-pre-wrap">${wrong.explanation}</p></div>` : ''}
-                </div>
-                <div class="question-meta mt-2">
-                    <p>Time spent: ${Math.floor(wrong.time_spent / 60)}m ${wrong.time_spent % 60}s</p>
-                    <p>Difficulty: <span class="difficulty-badge difficulty-${wrong.difficulty}">${wrong.difficulty}</span></p>
-                    ${wrong.notes ? `<p>Note: ${wrong.notes}</p>` : ''}
-                    <button type="button" class="btn btn-primary btn-sm mt-2 view-solution">View Solution</button>
-                </div>
-            `;
-            
-            // Add solution button functionality
-            wrongCard.querySelector('.view-solution').addEventListener('click', () => {
-                showSolution(wrong);
-            });
-            
-            wrongAnswersList.appendChild(wrongCard);
-        });
-    } else {
-        wrongAnswersSection.classList.add('hidden');
-    }
-    
-    // Render performance heatmap
-    renderPerformanceHeatmap(result);
-    
-    // Generate study focus recommendations
-    renderStudyFocusRecommendations(result);
-    
-    // Set up button actions
-    document.getElementById('btn-results-main-menu').onclick = () => showScreen('main-menu');
-    document.getElementById('btn-review-section').onclick = () => showReviewScreen(sectionName);
-}
-
-// ======================
-// SOLUTION TEMPLATE
-// ======================
-function showSolution(wrongQuestion) {
-    // Create solution modal
-    const solutionModal = document.createElement('div');
-    solutionModal.className = 'modal-overlay';
-    solutionModal.style.zIndex = 60;
-    solutionModal.innerHTML = `
-        <div class="modal-content" style="max-width: 80%; max-height: 80vh; overflow-y: auto; position: relative;">
-            <h2 class="section-title">Question ${wrongQuestion.number}</h2>
-            
-            <div class="question-stem mb-4">${wrongQuestion.stem}</div>
-            
-            <div class="solution-header mb-4">
-                <h3>Solution</h3>
-                <button type="button" class="btn btn-primary close-solution">Close</button>
-            </div>
-            
-            <div class="solution-content">
-                <div class="solution-steps">
-                    <h4>Step 1: Understanding the Problem</h4>
-                    <p>${wrongQuestion.solution?.step1 || 'This is where the explanation would begin, breaking down how to approach the question.'}</p>
-                    
-                    <h4>Step 2: Key Formulas</h4>
-                    <p>${wrongQuestion.solution?.step2 || 'Relevant formulas would be listed here with explanations of each variable.'}</p>
-                    
-                    <h4>Step 3: Calculation</h4>
-                    <p>${wrongQuestion.solution?.step3 || 'Detailed calculation process showing how to arrive at the answer.'}</p>
-                    
-                    <h4>Step 4: Final Answer</h4>
-                    <p>${wrongQuestion.solution?.step4 || 'Explanation of why the answer is correct and common pitfalls to avoid.'}</p>
-                </div>
-                
-                <div class="solution-note mt-4">
-                    <h4>Pro Tip:</h4>
-                    <p>${wrongQuestion.solution?.proTip || 'This is where additional tips and insights would be provided to help you understand the concept better.'}</p>
-                </div>
-                
-                <div class="solution-footer mt-4">
-                    <div class="solution-rating">
-                        <span>Difficulty:</span>
-                        <span class="difficulty-badge difficulty-${wrongQuestion.difficulty}">${wrongQuestion.difficulty.charAt(0).toUpperCase()}</span>
-                    </div>
-                    <div class="solution-topic">
-                        <span>Topic:</span>
-                        <span class="topic-badge">${wrongQuestion.topic || 'General'}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Add to document
-    document.body.appendChild(solutionModal);
-    
-    // Close button
-    solutionModal.querySelector('.close-solution').addEventListener('click', () => {
-        document.body.removeChild(solutionModal);
-    });
-    
-    // Auto-scroll to top
-    window.scrollTo(0, 0);
-}
-
-function renderPerformanceHeatmap(result) {
-    const ctx = document.getElementById('performance-heatmap').getContext('2d');
-    const section = result.section || 'CUSTOM';
-    const topics = section === 'CUSTOM' 
-        ? Object.keys(result.topicPerformance).slice(0, 20) 
-        : SECTIONS[section]?.topics || Object.keys(result.topicPerformance);
-    
-    // Calculate performance data
-    const data = topics.map(topic => {
-        const perf = result.topicPerformance[topic];
-        if (perf && perf.total > 0) {
-            return (perf.correct / perf.total) * 100;
-        }
-        return 0;
-    });
-    
-    // Create heatmap visualization
-    const canvas = document.getElementById('performance-heatmap');
-    const width = canvas.width;
-    const height = canvas.height;
-    const cellWidth = width / Math.min(20, topics.length);
-    const cellHeight = height;
-    
-    ctx.clearRect(0, 0, width, height);
-    
-    // Draw heatmap cells
-    data.forEach((percentage, index) => {
-        let color;
-        if (percentage < 50) {
-            color = 'rgba(220, 38, 38, 0.7)'; // Red
-        } else if (percentage < 75) {
-            color = 'rgba(245, 158, 11, 0.7)'; // Yellow
-        } else {
-            color = 'rgba(16, 185, 129, 0.7)'; // Green
-        }
-        
-        ctx.fillStyle = color;
-        ctx.fillRect(index * cellWidth, 0, cellWidth - 2, cellHeight);
-        
-        // Add labels
-        if (index < topics.length) {
-            ctx.fillStyle = '#000';
-            ctx.font = '10px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(topics[index], index * cellWidth + cellWidth/2, height - 10);
-        }
-    });
-}
-
-function renderStudyFocusRecommendations(result) {
-    const container = document.getElementById('study-focus-container');
-    container.innerHTML = '';
-    
-    // Get topic performance data
-    const topicPerformance = result.topicPerformance || {};
-    const topics = Object.keys(topicPerformance)
-        .filter(topic => topicPerformance[topic].total > 0)
-        .sort((a, b) => {
-            const perfA = topicPerformance[a];
-            const perfB = topicPerformance[b];
-            return (perfA.correct / perfA.total) - (perfB.correct / perfB.total);
-        });
-    
-    // Generate recommendations for weakest topics
-    const recommendations = topics.slice(0, 3).map((topic, index) => {
-        const perf = topicPerformance[topic];
-        const accuracy = Math.round((perf.correct / perf.total) * 100);
-        
-        return `
-            <div class="study-focus-item">
-                <strong>${topic}</strong>
-                <div>Accuracy: ${accuracy}% (${perf.correct}/${perf.total})</div>
-                <div class="mt-2">Recommended Action: 
-                    <ul class="ml-4 mt-1" style="list-style-type: disc;">
-                        <li>Review foundational concepts for ${topic}</li>
-                        <li>Practice ${topic} questions for 30 minutes</li>
-                        <li>Focus on ${topic} for your next study session</li>
-                    </ul>
-                </div>
-            </div>
-        `;
-    });
-    
-    // Add recommendations
-    container.innerHTML = recommendations.join('');
-}
-
-// ======================
-// REVIEW SCREEN
-// ======================
-function showReviewScreen(sectionName) {
-    const questions = localStorage.getItem(`examQuestions_${sectionName}`);
-    if (!questions) {
-        alert("Exam questions not found for review.");
+    const section = SECTIONS[sectionName];
+    const results = appState.results[sectionName];
+    if (!results || !section) {
+        showScreen('main-menu');
         return;
     }
+
+    document.getElementById('results-title').textContent = `${section.title} Results`;
+    document.getElementById('results-subtitle').textContent = `Submitted on ${new Date(results.submissionTime).toLocaleDateString()}`;
+
+    // Score and status
+    const scoreTextElement = document.getElementById('final-score');
+    scoreTextElement.textContent = `${results.score.percentage}%`;
+    scoreTextElement.style.color = results.isPassed ? 'var(--success-color)' : 'var(--danger-color)';
+
+    const statusElement = document.getElementById('passing-status');
+    statusElement.textContent = results.isPassed ? 'STATUS: PASSED' : 'STATUS: FAILED';
+    statusElement.style.color = results.isPassed ? 'var(--success-color)' : 'var(--danger-color)';
+
+    // Details
+    document.getElementById('results-details').innerHTML = `
+        <p><strong>Total Questions:</strong> ${results.score.total}</p>
+        <p style="color: var(--success-color);"><strong>Correct Answers:</strong> ${results.score.correct}</p>
+        <p style="color: var(--danger-color);"><strong>Incorrect Answers:</strong> ${results.score.wrong}</p>
+        <p><strong>Unanswered:</strong> ${results.score.unanswered}</p>
+        <p><strong>Time Spent:</strong> ${formatTime(results.timeTaken)}</p>
+    `;
+
+    // Performance Analysis (Difficulty and Topic Breakdown)
+    const analysis = appState.performanceData[sectionName];
+    let analysisHtml = '<h3>Performance Breakdown</h3>';
     
-    appState.examQuestions = JSON.parse(questions);
+    // Difficulty Breakdown
+    analysisHtml += '<h4>By Difficulty</h4>';
+    const diffData = analysis.difficultyDistribution;
+    Object.keys(diffData).forEach(key => {
+        const data = diffData[key];
+        const percentage = data.total > 0 ? (data.correct / data.total * 100).toFixed(0) : 0;
+        analysisHtml += `<p>${key.charAt(0).toUpperCase() + key.slice(1)}: ${data.correct} / ${data.total} (${percentage}%)</p>`;
+    });
+
+    // Topic Breakdown
+    analysisHtml += '<h4 class="mt-4">By Topic</h4>';
+    const topicData = analysis.topicPerformance;
+    Object.keys(topicData).forEach(key => {
+        const data = topicData[key];
+        const percentage = data.total > 0 ? (data.correct / data.total * 100).toFixed(0) : 0;
+        analysisHtml += `<p>${key}: ${data.correct} / ${data.total} (${percentage}%)</p>`;
+    });
+    
+    document.getElementById('performance-analysis').innerHTML = analysisHtml;
+
+    // Button actions
+    document.getElementById('btn-review-exam').onclick = () => showReviewScreen(sectionName);
+    document.getElementById('btn-results-back').onclick = () => showScreen('main-menu');
+}
+
+// ======================
+// REVIEW MODE
+// ======================
+function showReviewScreen(sectionName) {
     appState.reviewingSection = sectionName;
-    appState.answers[sectionName] = appState.answers[sectionName] || new Array(appState.examQuestions.length).fill(null);
-    const answers = appState.answers[sectionName];
-    const section = sectionName === 'CUSTOM' 
-        ? { title: 'Custom Exam' } 
-        : SECTIONS[sectionName];
+    appState.view = 'review';
+    document.body.classList.add('review-mode');
+    document.body.classList.remove('nav-step');
     
-    // Update screen elements
-    document.getElementById('review-section-title').textContent = section.title;
-    document.getElementById('review-progress').textContent = `Reviewing all ${appState.examQuestions.length} questions`;
+    // Clear the active question class in case it was set
+    document.querySelectorAll('.question-card').forEach(card => card.classList.remove('active-question'));
     
-    // Set up filters
-    const filterSelect = document.getElementById('review-filter');
-    filterSelect.value = 'all';
-    filterSelect.onchange = applyReviewFilters;
-    
-    const difficultySelect = document.getElementById('review-difficulty');
-    difficultySelect.value = 'all';
-    difficultySelect.onchange = applyReviewFilters;
-    
-    const searchInput = document.getElementById('review-search');
-    searchInput.value = '';
-    searchInput.oninput = applyReviewFilters;
-    
-    const container = document.getElementById('review-questions-container');
-    container.innerHTML = '';
-    
-    // Render questions
-    renderReviewQuestions();
-    
-    // Set up button actions
-    document.getElementById('btn-review-back').onclick = () => showScreen('main-menu');
-    
-    // Render answer pattern analysis
-    renderAnswerPatternAnalysis(sectionName);
-    
-    // Show the screen
+    renderReview();
     showScreen('review');
 }
 
-function renderReviewQuestions() {
+function renderReview() {
     const sectionName = appState.reviewingSection;
-    const answers = appState.answers[sectionName];
-    const container = document.getElementById('review-questions-container');
-    container.innerHTML = '';
+    const section = SECTIONS[sectionName];
+    const results = appState.results[sectionName];
     
-    const filter = document.getElementById('review-filter').value;
-    const difficulty = document.getElementById('review-difficulty').value;
-    const searchTerm = document.getElementById('review-search').value.toLowerCase();
+    document.getElementById('review-title').textContent = `Review: ${section.title}`;
+    document.getElementById('review-subtitle').textContent = results.isPassed ? 'Passed' : 'Failed';
+    document.getElementById('review-subtitle').style.color = results.isPassed ? 'var(--success-color)' : 'var(--danger-color)';
+
+    document.getElementById('review-summary-text').innerHTML = `
+        <span style="color: var(--success-color); font-weight: bold;">${results.score.correct} Correct</span> | 
+        <span style="color: var(--danger-color); font-weight: bold;">${results.score.wrong} Incorrect</span> | 
+        <span class="text-muted" style="font-weight: bold;">${results.score.unanswered} Unanswered</span>
+    `;
+
+    // Load questions using the stored question order
+    const orderedQuestions = getQuestionsByOrder(sectionName);
+    appState.examQuestions = orderedQuestions; // Temporarily update examQuestions for rendering
     
-    appState.examQuestions.forEach((question, index) => {
-        const userAnswer = answers[index];
-        const isCorrect = userAnswer === question.correct_answer;
-        const isAnswered = userAnswer !== null;
-        const flagged = appState.flaggedQuestions[sectionName]?.[index] || false;
-        const notes = appState.questionNotes[sectionName]?.[index] || '';
-        const timeSpent = appState.questionTimes[sectionName]?.[index] || 0;
-        const difficultyLevel = appState.questionDifficulty[sectionName]?.[index] || 'medium';
+    const reviewContainer = document.getElementById('review-questions-container');
+    reviewContainer.innerHTML = orderedQuestions.map((question, index) => renderReviewQuestion(question, index, results)).join('');
+
+    // Attach event listeners for the review screen
+    attachReviewEventListeners();
+    
+    // Jump to first wrong logic
+    const jumpButton = document.getElementById('btn-jump-wrong');
+    if (results.firstWrongIndex !== -1) {
+        jumpButton.disabled = false;
+        jumpButton.onclick = () => {
+            document.getElementById(`review-question-${results.firstWrongIndex}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+    } else {
+        jumpButton.disabled = true;
+    }
+    
+    document.getElementById('btn-review-back').onclick = () => {
+        document.body.classList.remove('review-mode');
+        showScreen('main-menu');
+    };
+    
+    document.getElementById('btn-review-nav-mode').onclick = toggleReviewNavMode;
+    
+    // Initialize view mode
+    if (document.body.classList.contains('nav-step')) {
+        goToReviewQuestion(0);
+    }
+}
+
+function getQuestionsByOrder(sectionName) {
+    const results = appState.results[sectionName];
+    const savedQuestionIds = results.questionOrder;
+    
+    // This function assumes the fullQuestionBank is loaded and contains all questions by id
+    return savedQuestionIds.map(id => 
+        appState.fullQuestionBank.find(q => q.id === id) || 
+        getFallbackQuestions().find(q => q.id === id) || 
+        { id, stem: `Question ID ${id} not found.`, choices: [{ text: 'Error' }], answer: 0 }
+    );
+}
+
+function renderReviewQuestion(question, index, results) {
+    const sectionName = appState.reviewingSection;
+    const userAnswer = results.answers[index];
+    const isCorrect = userAnswer === question.answer;
+    const isFlagged = appState.flaggedQuestions[sectionName]?.[index] || false;
+    const noteContent = appState.questionNotes[sectionName]?.[index] || '';
+    const timeSpent = appState.questionTimes[sectionName]?.[index] || 0;
+    
+    const statusClass = isCorrect ? 'correct' : (userAnswer !== null ? 'incorrect' : 'unanswered');
+    const statusText = isCorrect ? 'Correct' : (userAnswer !== null ? 'Incorrect' : 'Unanswered');
+    
+    // Check for group start (simple version for review)
+    let groupHeader = '';
+    if (question.group_id && (index === 0 || question.group_id !== appState.examQuestions[index - 1].group_id)) {
+        groupHeader = `
+            <div class="card mb-4 p-4" style="background: var(--secondary-color);">
+                <p class="question-group" style="font-size: 1.125rem; font-weight: 600;">Situation</p>
+                <p class="question-stem">${question.stem}</p>
+                ${question.image ? `<div class="question-image">
+                    <img src="${question.image}" alt="Figure for Question ${index + 1}" data-src="${question.image}" />
+                </div>` : ''}
+            </div>
+        `;
+    }
+    
+    // Only display question number if not the start of a group
+    const displayIndex = index + 1;
+    const stemContent = groupHeader ? '' : question.stem;
+
+    const choiceLetters = ['A', 'B', 'C', 'D'];
+    
+    const choicesHtml = question.choices.map((choice, choiceIndex) => {
+        const isSelected = choiceIndex === userAnswer;
+        const isAnswer = choiceIndex === question.answer;
         
-        // Apply filters
-        if (filter === 'correct' && !isCorrect) return;
-        if (filter === 'wrong' && (isCorrect || !isAnswered)) return;
-        if (filter === 'skipped' && isAnswered) return;
-        if (filter === 'flagged' && !flagged) return;
-        
-        if (difficulty !== 'all' && difficultyLevel !== difficulty) return;
-        
-        // Apply search
-        const searchMatch = question.stem.toLowerCase().includes(searchTerm) ||
-                          question.choices.some(c => c.toLowerCase().includes(searchTerm));
-        if (searchTerm && !searchMatch) return;
-        
-        let resultIndicator = '❓ Skipped';
-        let indicatorColor = 'var(--warning-color)';
-        
-        if (isAnswered) {
-            resultIndicator = isCorrect ? '✅ Correct' : '❌ Wrong';
-            indicatorColor = isCorrect ? 'var(--success-color)' : 'var(--danger-color)';
+        let className = '';
+        if (isAnswer) {
+            className = 'correct';
+        } else if (isSelected && !isCorrect) {
+            className = 'incorrect selected';
+        } else if (isSelected && isCorrect) {
+            className = 'correct selected'; // Correctly answered, but still highlight as correct
         }
         
-        let choicesHtml = '';
-        question.choices.forEach((choice, choiceIndex) => {
-            const letter = String.fromCharCode(65 + choiceIndex);
-            const isChoiceCorrect = letter === question.correct_answer;
-            const isChoiceUser = letter === userAnswer;
-            let choiceClass = '';
-            
-            if (isChoiceCorrect) {
-                choiceClass = 'bg-green-100 border-green-500';
-            } else if (isChoiceUser) {
-                choiceClass = 'bg-red-100 border-red-500';
-            }
-            
-            choicesHtml += `
-                <button type="button" class="choice-btn ${choiceClass}" disabled>
-                    <span class="choice-letter">${letter}.</span>
-                    <span>${choice.trim()}</span>
-                </button>
-            `;
-        });
-        
-        const reviewCard = document.createElement('div');
-        reviewCard.className = 'review-question-card';
-        reviewCard.id = `review-question-${index}`;
-        reviewCard.innerHTML = `
+        return `
+            <div class="choice-btn ${className}">
+                <span class="choice-letter">${choiceLetters[choiceIndex]}</span>
+                <span class="choice-text">${choice.text}</span>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        ${groupHeader}
+        <div class="question-card review-card ${statusClass} ${isFlagged ? 'flagged' : ''}" id="review-question-${index}" data-index="${index}">
             <div class="question-header">
-                <div>
-                    <p class="question-number">Question ${index + 1}</p>
-                    <span class="difficulty-badge difficulty-${difficultyLevel}">${difficultyLevel.charAt(0).toUpperCase()}</span>
-                    ${question.group_id && question.stem.trim().startsWith('Situation') ? `<p class="question-group">Situation: ${question.group_id}</p>` : (question.group_id ? `<p class="question-group">Problem from Situation ${question.group_id}</p>` : '')}
-                    <p class="result-indicator" style="font-weight: bold; margin-top: 0.25rem; color: ${indicatorColor}">${resultIndicator}</p>
-                    <p class="time-spent">Time spent: ${Math.floor(timeSpent / 60)}m ${timeSpent % 60}s</p>
-                </div>
-                ${flagged ? `<span class="flagged-indicator"></span>` : ''}
+                <span class="question-number">Question ${displayIndex} 
+                    <span class="feature-badge" style="background: ${isCorrect ? 'var(--success-color)' : 'var(--danger-color)'};">${statusText.toUpperCase()}</span>
+                    ${isFlagged ? '<span class="feature-badge" style="background: var(--warning-color);">FLAGGED</span>' : ''}
+                </span>
+                <p class="question-group">${question.topic || 'No Topic'}</p>
             </div>
-            <p class="question-stem whitespace-pre-wrap">${question.stem}</p>
-            ${question.figure ? `<div class="question-image"><img src="${question.figure}" alt="Figure for question ${index + 1}" data-figure="${question.figure}"></div>` : ''}
-            <div class="choices-container">${choicesHtml}</div>
-            <div class="answer-comparison" style="margin-top: 1.5rem;">
-                <p class="correct-answer">Correct Answer: ${question.correct_answer}</p>
-                ${isAnswered ? `<p class="user-answer">Your Answer: ${userAnswer}</p>` : ''}
-            </div>
-            ${question.explanation ? `<div class="explanation"><p class="explanation-title">Explanation:</p><p class="whitespace-pre-wrap">${question.explanation}</p></div>` : ''}
-            ${notes ? `<div class="note-container">
-                <div class="note-header">
-                    <span>Notes</span>
-                </div>
-                <p>${notes}</p>
+            ${groupHeader ? '' : `<p class="question-stem">${stemContent}</p>`}
+            ${question.image && !groupHeader ? `<div class="question-image">
+                <img src="${question.image}" alt="Figure for Question ${index + 1}" data-src="${question.image}" />
             </div>` : ''}
-        `;
-        container.appendChild(reviewCard);
-    });
-    
-    // Add image zoom functionality
-    document.querySelectorAll('img[data-figure]').forEach(img => {
-        img.addEventListener('click', () => {
-            document.getElementById('zoomed-image').src = img.src;
-            document.getElementById('image-modal').classList.remove('hidden');
-        });
-    });
-}
-
-function applyReviewFilters() {
-    renderReviewQuestions();
-}
-
-function renderAnswerPatternAnalysis(sectionName) {
-    const container = document.getElementById('answer-patterns');
-    container.innerHTML = '';
-    
-    const result = appState.results[sectionName];
-    if (!result || !result.answerPatterns) return;
-    
-    // Common mistakes
-    const commonMistakes = result.answerPatterns.commonMistakes;
-    if (commonMistakes.length > 0) {
-        const mistakesHtml = commonMistakes.map(mistake => `
-            <div class="answer-pattern">
-                <div class="pattern-title">Question ${mistake.question.id}</div>
-                <div class="pattern-description">
-                    <strong>You answered:</strong> ${mistake.userAnswer} 
-                    <br>
-                    <strong>Correct answer:</strong> ${mistake.correctAnswer}
-                    <br>
-                    <strong>Times repeated:</strong> ${mistake.count}
-                </div>
+            
+            <div class="choices-container">
+                ${choicesHtml}
             </div>
-        `).join('');
+            
+            <div class="solution-container">
+                <p class="solution-title">Solution</p>
+                <p class="solution-text whitespace-pre-wrap">${question.solution || 'No detailed solution provided.'}</p>
+            </div>
+            
+            ${noteContent || timeSpent > 0 ? `
+            <div class="note-container">
+                <div class="note-header">
+                    <span>Your Details</span>
+                </div>
+                ${noteContent ? `<p style="white-space: pre-wrap;"><strong>Your Notes:</strong> ${noteContent}</p>` : ''}
+                <p><strong>Time Spent:</strong> ${formatTime(timeSpent)}</p>
+            </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+function attachReviewEventListeners() {
+    // Image zoom
+    document.querySelectorAll('.question-image img').forEach(img => {
+        img.addEventListener('click', handleImageZoom);
+    });
+}
+
+function toggleReviewNavMode() {
+    const isStepMode = document.body.classList.contains('nav-step');
+    
+    if (isStepMode) {
+        // Switch to scroll
+        document.body.classList.remove('nav-step');
+        document.getElementById('btn-review-nav-mode').textContent = 'View Step-by-Step';
+        // Clear active question class
+        document.querySelectorAll('.question-card').forEach(card => card.classList.remove('active-question'));
+        // Re-enable jump button
+        document.getElementById('btn-jump-wrong').classList.remove('hidden');
+    } else {
+        // Switch to step
+        document.body.classList.add('nav-step');
+        document.getElementById('btn-review-nav-mode').textContent = 'View All (Scroll)';
+        // Jump to the first question
+        goToReviewQuestion(0);
+        // Hide jump button
+        document.getElementById('btn-jump-wrong').classList.add('hidden');
+    }
+}
+
+function goToReviewQuestion(index) {
+    const total = appState.examQuestions.length;
+    if (index < 0 || index >= total) return;
+    
+    const allReviewCards = document.querySelectorAll('.question-card.review-card');
+    allReviewCards.forEach(card => card.classList.remove('active-question'));
+    document.getElementById(`review-question-${index}`).classList.add('active-question');
+
+    // Navigation buttons for review step mode (re-using exam buttons, but in a hidden container)
+    const container = document.getElementById('screen-review').querySelector('.action-buttons');
+    if (!container.querySelector('#btn-review-prev')) {
+        container.innerHTML = `
+            <div class="nav-buttons" style="width: 100%;">
+                <button type="button" id="btn-review-prev" class="btn btn-secondary" style="width: 48%;">
+                    <svg class="icon" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    Previous
+                </button>
+                <button type="button" id="btn-review-next" class="btn btn-primary" style="width: 48%;">
+                    Next
+                    <svg class="icon" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+            </div>
+            <button type="button" id="btn-review-back" class="btn btn-secondary">Back to Main Menu</button>
+        ` + container.innerHTML;
         
-        container.innerHTML += `
-            <div class="col-span-2">
-                <h3 class="font-bold mb-2">Common Mistakes</h3>
-                ${mistakesHtml}
-            </div>
-        `;
+        document.getElementById('btn-review-prev').onclick = () => goToReviewQuestion(index - 1);
+        document.getElementById('btn-review-next').onclick = () => goToReviewQuestion(index + 1);
     }
     
-    // Streak analysis
-    if (result.answerPatterns.streakAnalysis && result.answerPatterns.streakAnalysis.length > 0) {
-        const streak = result.answerPatterns.streakAnalysis[0];
-        container.innerHTML += `
-            <div class="col-span-2">
-                <h3 class="font-bold mb-2">Answer Streaks</h3>
-                <div class="answer-pattern">
-                    <div class="pattern-title">Performance Streaks</div>
-                    <div class="pattern-description">
-                        <strong>Longest correct streak:</strong> ${streak.maxCorrectStreak} questions
-                        <br>
-                        <strong>Longest incorrect streak:</strong> ${streak.maxWrongStreak} questions
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+    document.getElementById('btn-review-prev').classList.toggle('hidden', index === 0);
+    document.getElementById('btn-review-next').classList.toggle('hidden', index === total - 1);
     
-    // Time analysis
-    if (result.answerPatterns.timeAnalysis) {
-        container.innerHTML += `
-            <div class="col-span-2">
-                <h3 class="font-bold mb-2">Time Management</h3>
-                <div class="answer-pattern">
-                    <div class="pattern-title">Time Per Question</div>
-                    <div class="pattern-description">
-                        <strong>Easy questions:</strong> ${result.answerPatterns.timeAnalysis.timePerQuestion.easy.avg} seconds
-                        <br>
-                        <strong>Medium questions:</strong> ${result.answerPatterns.timeAnalysis.timePerQuestion.medium.avg} seconds
-                        <br>
-                        <strong>Hard questions:</strong> ${result.answerPatterns.timeAnalysis.timePerQuestion.hard.avg} seconds
-                    </div>
-                </div>
-            </div>
-        `;
+    document.getElementById('btn-review-back').style.display = 'block'; // Ensure back button is visible
+}
+
+// ======================
+// SETTINGS MODAL
+// ======================
+function renderSettingsModal() {
+    document.getElementById('theme-select').value = appState.settings.theme;
+    document.getElementById('font-size-select').value = appState.settings.fontSize;
+    document.getElementById('navigation-mode-select').value = appState.settings.navigationMode;
+    document.getElementById('show-timer').checked = appState.settings.showTimer;
+    document.getElementById('show-progress').checked = appState.settings.showProgress;
+    document.getElementById('randomize-questions-setting').checked = appState.settings.randomizeQuestions;
+    document.getElementById('show-difficulty').checked = appState.settings.showDifficulty;
+
+    document.getElementById('theme-select').onchange = updateSettings;
+    document.getElementById('font-size-select').onchange = updateSettings;
+    document.getElementById('navigation-mode-select').onchange = updateSettings;
+    document.getElementById('show-timer').onchange = updateSettings;
+    document.getElementById('show-progress').onchange = updateSettings;
+    document.getElementById('randomize-questions-setting').onchange = updateSettings;
+    document.getElementById('show-difficulty').onchange = updateSettings;
+    document.getElementById('btn-close-settings').onclick = () => {
+        document.getElementById('settings-modal').classList.add('hidden');
+    };
+}
+
+function updateSettings() {
+    const newSettings = {
+        theme: document.getElementById('theme-select').value,
+        fontSize: document.getElementById('font-size-select').value,
+        navigationMode: document.getElementById('navigation-mode-select').value,
+        showTimer: document.getElementById('show-timer').checked,
+        showProgress: document.getElementById('show-progress').checked,
+        randomizeQuestions: document.getElementById('randomize-questions-setting').checked,
+        showDifficulty: document.getElementById('show-difficulty').checked
+    };
+    appState.settings = newSettings;
+    saveState();
+    applySettings(newSettings);
+}
+
+function applySettings(settings) {
+    // Theme
+    document.documentElement.classList.toggle('dark', settings.theme === 'dark');
+    document.body.classList.remove('light', 'dark');
+    document.body.classList.add(settings.theme);
+
+    // Font Size
+    document.body.classList.remove('font-small', 'font-medium', 'font-large');
+    document.body.classList.add(`font-${settings.fontSize}`);
+
+    // Navigation Mode
+    document.body.classList.remove('nav-scroll', 'nav-step');
+    document.body.classList.add(`nav-${settings.navigationMode}`);
+
+    // Re-render the exam if we're on it to apply navigation mode changes
+    if (appState.view === 'exam') {
+        renderExam();
     }
 }
 
 // ======================
 // CONFIRMATION MODAL
 // ======================
-function showConfirmModal(title, message, onConfirm) {
+let pendingConfirmAction = null;
+
+function confirmAction(title, message, action) {
     document.getElementById('confirm-title').textContent = title;
     document.getElementById('confirm-message').textContent = message;
-    document.getElementById('confirm-modal').classList.remove('hidden');
     
-    const cancelBtn = document.getElementById('btn-confirm-cancel');
-    const okBtn = document.getElementById('btn-confirm-ok');
-    
-    // Prevent duplicate event listeners
-    const newCancelBtn = cancelBtn.cloneNode(true);
-    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-    const newOkBtn = okBtn.cloneNode(true);
-    okBtn.parentNode.replaceChild(newOkBtn, okBtn);
-    
-    const handleCancel = () => {
+    pendingConfirmAction = action;
+
+    document.getElementById('btn-confirm-ok').onclick = () => {
         document.getElementById('confirm-modal').classList.add('hidden');
+        if (pendingConfirmAction) {
+            pendingConfirmAction();
+        }
     };
     
-    const handleConfirm = () => {
-        onConfirm();
-        handleCancel();
+    document.getElementById('btn-confirm-cancel').onclick = () => {
+        document.getElementById('confirm-modal').classList.add('hidden');
+        pendingConfirmAction = null;
     };
-    
-    newCancelBtn.addEventListener('click', handleCancel);
-    newOkBtn.addEventListener('click', handleConfirm);
+
+    document.getElementById('confirm-modal').classList.remove('hidden');
 }
 
-// ======================
-// SETTINGS SCREEN
-// ======================
-function renderSettingsScreen() {
-    // Apply current settings
-    document.querySelectorAll('.theme-switcher button').forEach(btn => {
-        btn.classList.remove('selected');
-        if (btn.id === `theme-${appState.settings.theme}`) {
-            btn.classList.add('selected');
-        }
-    });
-    
-    document.querySelectorAll('.font-switcher button').forEach(btn => {
-        btn.classList.remove('selected');
-        if (btn.id === `font-${appState.settings.fontSize}`) {
-            btn.classList.add('selected');
-        }
-    });
-    
-    document.querySelectorAll('.nav-mode-switcher button').forEach(btn => {
-        btn.classList.remove('selected');
-        if (btn.id === `nav-${appState.settings.navigationMode}`) {
-            btn.classList.add('selected');
-        }
-    });
-    
-    // Auto-save status
-    const autoSaveStatus = document.getElementById('auto-save-status');
-    autoSaveStatus.textContent = appState.settings.autoSave ? '✅' : '❌';
-    
-    // Show timer status
-    const showTimerStatus = document.getElementById('show-timer-status');
-    showTimerStatus.textContent = appState.settings.showTimer ? '✅' : '❌';
-    
-    // Show progress status
-    const showProgressStatus = document.getElementById('show-progress-status');
-    showProgressStatus.textContent = appState.settings.showProgress ? '✅' : '❌';
-    
-    // Randomize status
-    const randomizeStatus = document.getElementById('randomize-status');
-    randomizeStatus.textContent = appState.settings.randomizeQuestions ? '✅' : '❌';
-    
-    // Show difficulty status
-    const showDifficultyStatus = document.getElementById('show-difficulty-status');
-    showDifficultyStatus.textContent = appState.settings.showDifficulty ? '✅' : '❌';
-    
-    // Theme switcher
-    document.getElementById('theme-light').addEventListener('click', () => {
-        appState.settings.theme = 'light';
-        document.documentElement.classList.remove('dark');
-        document.body.classList.remove('dark');
-        document.body.classList.add('light');
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    document.getElementById('theme-dark').addEventListener('click', () => {
-        appState.settings.theme = 'dark';
-        document.documentElement.classList.add('dark');
-        document.body.classList.add('dark');
-        document.body.classList.remove('light');
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    // Font size
-    document.getElementById('font-small').addEventListener('click', () => {
-        appState.settings.fontSize = 'small';
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    document.getElementById('font-medium').addEventListener('click', () => {
-        appState.settings.fontSize = 'medium';
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    document.getElementById('font-large').addEventListener('click', () => {
-        appState.settings.fontSize = 'large';
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    // Navigation mode
-    document.getElementById('nav-scroll').addEventListener('click', () => {
-        appState.settings.navigationMode = 'scroll';
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    document.getElementById('nav-step').addEventListener('click', () => {
-        appState.settings.navigationMode = 'step';
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    // Auto-save toggle
-    document.getElementById('btn-auto-save').addEventListener('click', () => {
-        appState.settings.autoSave = !appState.settings.autoSave;
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    // Show timer toggle
-    document.getElementById('btn-show-timer').addEventListener('click', () => {
-        appState.settings.showTimer = !appState.settings.showTimer;
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    // Show progress toggle
-    document.getElementById('btn-show-progress').addEventListener('click', () => {
-        appState.settings.showProgress = !appState.settings.showProgress;
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    // Randomize questions toggle
-    document.getElementById('btn-randomize-questions').addEventListener('click', () => {
-        appState.settings.randomizeQuestions = !appState.settings.randomizeQuestions;
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    // Show difficulty toggle
-    document.getElementById('btn-show-difficulty').addEventListener('click', () => {
-        appState.settings.showDifficulty = !appState.settings.showDifficulty;
-        saveState();
-        renderSettingsScreen();
-    });
-    
-    // Back button
-    document.getElementById('btn-settings-back').addEventListener('click', () => showScreen('main-menu'));
-}
 
 // ======================
-// PDF GENERATION
-// ======================
-function generateOfflinePDF() {
-    // Create a visual PDF container
-    const pdfContainer = document.getElementById('pdf-container');
-    pdfContainer.innerHTML = '';
-    
-    // Add header
-    const header = document.createElement('div');
-    header.className = 'printable-header';
-    header.innerHTML = `
-        <h2 class="printable-title">Civil Engineering Exam Simulator</h2>
-        <p class="printable-subtitle">Printable version for offline study</p>
-        <p class="text-muted">This document contains all exam questions with figures and explanations for offline study</p>
-    `;
-    pdfContainer.appendChild(header);
-    
-    // Add sections
-    Object.values(SECTIONS).forEach((section, sectionIndex) => {
-        const sectionContainer = document.createElement('div');
-        sectionContainer.className = 'printable-section';
-        sectionContainer.innerHTML = `<h3 class="printable-title">Section ${sectionIndex + 1}: ${section.title}</h3>`;
-        
-        const questions = getQuestionsForSection(section.name);
-        questions.forEach((question, index) => {
-            const questionContainer = document.createElement('div');
-            questionContainer.className = 'printable-question';
-            questionContainer.innerHTML = `
-                <h3>Question ${index + 1}</h3>
-                <div class="printable-stem">${question.stem}</div>
-            `;
-            
-            // Add figure if exists
-            if (question.figure) {
-                const figureContainer = document.createElement('div');
-                figureContainer.className = 'printable-figure';
-                figureContainer.innerHTML = `
-                    <img src="${question.figure}" alt="Figure for question ${index + 1}">
-                    <p>Figure ${index + 1}: ${question.figure_caption || ''}</p>
-                `;
-                questionContainer.appendChild(figureContainer);
-            }
-            
-            // Add choices
-            const choicesContainer = document.createElement('div');
-            choicesContainer.className = 'printable-choices';
-            choicesContainer.innerHTML = '<p>Choices:</p>';
-            
-            question.choices.forEach((choice, choiceIndex) => {
-                const letter = String.fromCharCode(65 + choiceIndex);
-                const choiceDiv = document.createElement('div');
-                choiceDiv.className = 'printable-choice';
-                choiceDiv.innerHTML = `<span class="choice-letter">${letter}.</span> ${choice.trim()}`;
-                choicesContainer.appendChild(choiceDiv);
-            });
-            
-            questionContainer.appendChild(choicesContainer);
-            
-            // Add explanation if exists
-            if (question.explanation) {
-                const explanationContainer = document.createElement('div');
-                explanationContainer.className = 'printable-explanation';
-                explanationContainer.innerHTML = `
-                    <h4>Explanation:</h4>
-                    <p>${question.explanation}</p>
-                `;
-                questionContainer.appendChild(explanationContainer);
-            }
-            
-            sectionContainer.appendChild(questionContainer);
-        });
-        
-        pdfContainer.appendChild(sectionContainer);
-    });
-    
-    // Add footer
-    const footer = document.createElement('div');
-    footer.className = 'printable-footer';
-    footer.innerHTML = `
-        <p>© ${new Date().getFullYear()} Civil Engineering Exam Simulator. All rights reserved.</p>
-        <p>Generated on: ${new Date().toLocaleString()}</p>
-        <p class="text-muted">This document is for personal study purposes only. Do not distribute.</p>
-    `;
-    pdfContainer.appendChild(footer);
-    
-    // Show the PDF container for print preview
-    pdfContainer.style.display = 'block';
-    
-    // Use the browser's native print dialog
-    window.print();
-    
-    // Hide the container again after printing
-    setTimeout(() => {
-        pdfContainer.style.display = 'none';
-    }, 1000);
-}
-
-// ======================
-// HTML DECODING UTILITY
-// ======================
-function decodeHtmlEntities(text) {
-    const tempElement = document.createElement('div');
-    tempElement.innerHTML = text;
-    return tempElement.textContent || tempElement.innerText || '';
-}
-
-// ======================
-// OTHER UTILITIES
+// FALLBACKS (for local demo without question_bank.json)
 // ======================
 function getFallbackQuestions() {
-    return [
-        {
-            id: 1,
-            section: "AMSTHEC",
-            topic: "Trigonometry",
-            difficulty: "medium",
-            solution: {
-                step1: "Identify the triangle formed by the surveyor, the top of the building, and the base of the building.",
-                step2: "Use the tangent function: tan(θ) = opposite/adjacent",
-                step3: "tan(30°) = height / 50, so height = 50 * tan(30°)",
-                step4: "Calculate: 50 * (1/√3) = 28.87 meters",
-                proTip: "Remember that tan(30°) = 1/√3 ≈ 0.577"
-            },
-            stem: "A surveyor wants to measure the height of a building using a theodolite. If the angle of elevation to the top of the building is 30° and the distance from the theodolite to the building is 50 meters, what is the height of the building?",
-            choices: [
-                "25 meters",
-                "28.87 meters",
-                "43.30 meters",
-                "50 meters"
-            ],
-            correct_answer: "B",
-            explanation: "Using the tangent function: tan(30°) = height / 50. Height = 50 * tan(30°) = 50 * (1/√3) ≈ 28.87 meters."
-        },
-        {
-            id: 2,
-            section: "AMSTHEC",
-            topic: "Calculus",
-            difficulty: "hard",
-            solution: {
-                step1: "Identify the function as a polynomial: f(x) = 3x² + 5x - 2",
-                step2: "Apply the power rule: d/dx(x^n) = nx^(n-1)",
-                step3: "Differentiate each term: d/dx(3x²) = 6x, d/dx(5x) = 5, d/dx(-2) = 0",
-                step4: "Combine results: f'(x) = 6x + 5",
-                proTip: "Remember that the derivative of a constant is always 0"
-            },
-            stem: "What is the derivative of f(x) = 3x² + 5x - 2?",
-            choices: [
-                "6x + 5",
-                "3x + 5",
-                "6x² + 5",
-                "x² + 5x"
-            ],
-            correct_answer: "A",
-            explanation: "The derivative of 3x² is 6x, the derivative of 5x is 5, and the derivative of a constant (-2) is 0. So f'(x) = 6x + 5."
-        },
-        {
-            id: 3,
-            section: "HPGE",
-            topic: "Soil Mechanics",
-            difficulty: "medium",
-            solution: {
-                step1: "Understand the relationship between void ratio (e) and porosity (n)",
-                step2: "Use the formula: n = e / (1 + e)",
-                step3: "Substitute e = 0.6 into the formula",
-                step4: "Calculate: n = 0.6 / (1 + 0.6) = 0.6 / 1.6 = 0.375",
-                proTip: "Remember that porosity is always less than the void ratio"
-            },
-            stem: "In a soil sample, the void ratio is 0.6 and the specific gravity of soil solids is 2.7. What is the porosity of the soil?",
-            choices: [
-                "0.375",
-                "0.6",
-                "0.625",
-                "0.75"
-            ],
-            correct_answer: "A",
-            explanation: "Porosity (n) = e / (1 + e), where e is the void ratio. n = 0.6 / (1 + 0.6) = 0.6 / 1.6 = 0.375."
-        },
-        {
-            id: 4,
-            section: "PSAD",
-            topic: "Concrete Design",
-            difficulty: "hard",
-            solution: {
-                step1: "Review building code requirements for minimum reinforcement",
-                step2: "Understand that minimum reinforcement is needed to ensure ductile behavior",
-                step3: "Recall the standard minimum reinforcement ratio for simply supported beams",
-                step4: "The minimum reinforcement ratio is typically 0.003 (0.3%)",
-                proTip: "This minimum ensures the beam fails in tension rather than brittle compression"
-            },
-            stem: "What is the minimum reinforcement ratio for a simply supported reinforced concrete beam?",
-            choices: [
-                "0.001",
-                "0.002",
-                "0.003",
-                "0.005"
-            ],
-            correct_answer: "C",
-            explanation: "The minimum reinforcement ratio for a simply supported reinforced concrete beam is typically 0.003 (0.3%) to ensure ductile behavior."
+    // Provides a minimal set of questions for testing if question_bank.json fails to load.
+    const questions = [];
+    let idCounter = 1;
+    
+    Object.keys(SECTIONS).forEach(sectionKey => {
+        for (let i = 0; i < 5; i++) {
+            questions.push({
+                id: `Q${idCounter++}`,
+                section: sectionKey,
+                topic: SECTIONS[sectionKey].topics[0],
+                difficulty: ['easy', 'medium', 'hard'][i % 3],
+                stem: `[${sectionKey} Fallback Q${i+1}] A typical problem in ${SECTIONS[sectionKey].topics[0]} might ask for...`,
+                choices: [
+                    { text: "Option A" },
+                    { text: "Option B" },
+                    { text: "Option C - Correct" },
+                    { text: "Option D" }
+                ],
+                answer: 2,
+                solution: "This is the default solution for the fallback question. Assume the third choice is correct."
+            });
         }
-    ];
+    });
+    return questions;
 }
 
 function getSampleQuestions(sectionName) {
-    return getFallbackQuestions().filter(q => q.section === sectionName);
+    return getFallbackQuestions().filter(q => q.section === sectionName).slice(0, SECTION_REQUIREMENTS[sectionName].total);
+}
+
+function getDifficultyColor(difficulty) {
+    switch (difficulty) {
+        case 'easy': return '#10b981'; // green
+        case 'medium': return '#f59e0b'; // amber
+        case 'hard': return '#dc2626'; // red
+        default: return '#6b7280'; // gray
+    }
 }
 
 // ======================
 // INITIALIZATION
 // ======================
 document.addEventListener('DOMContentLoaded', async () => {
-    // Apply saved theme
-    if (appState.settings.theme === 'dark') {
-        document.documentElement.classList.add('dark');
-        document.body.classList.add('dark');
-        document.body.classList.remove('light');
-    } else {
-        document.documentElement.classList.remove('dark');
-        document.body.classList.add('light');
-        document.body.classList.remove('dark');
-    }
     
-    // Apply font size
-    document.body.classList.add(`font-${appState.settings.fontSize}`);
-    
-    // Apply navigation mode
-    document.body.classList.add(`nav-${appState.settings.navigationMode}`);
+    // Apply saved settings
+    applySettings(appState.settings);
     
     // Show loading screen
     showScreen('loading');
@@ -2087,7 +1629,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Prevent default form submission
-    document.querySelectorAll('form').forEach(form => {
-        form.addEventListener('submit', e => e.preventDefault());
-    });
+    document.querySelector('form')?.addEventListener('submit', (e) => e.preventDefault());
 });
