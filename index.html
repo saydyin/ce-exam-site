@@ -9,14 +9,15 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <!-- Loading Screen -->
   <div id="screen-loading" class="screen loading-container">
     <div class="spinner"></div>
     <p class="mt-4 text-muted">Loading exam data...</p>
   </div>
 
+  <!-- Main Menu -->
   <div id="screen-main-menu" class="screen hidden">
-    <!-- Main menu content -->
-    <div class="container screen">
+    <div class="container">
       <div class="header">
         <h1>Civil Engineering Exam Simulator</h1>
         <p id="progress-text"></p>
@@ -52,7 +53,7 @@
     </div>
   </div>
 
-  <!-- Other screens: instructions, exam, results, review, custom-exam -->
+  <!-- Instructions -->
   <div id="screen-instructions" class="screen hidden">
     <div class="container">
       <h2 id="instructions-section-title" class="section-title"></h2>
@@ -72,6 +73,7 @@
     </div>
   </div>
 
+  <!-- Exam -->
   <div id="screen-exam" class="screen flex flex-col hidden">
     <div class="exam-header">
       <div class="container">
@@ -121,14 +123,15 @@
     </div>
   </div>
 
+  <!-- Results -->
   <div id="screen-results" class="screen hidden">
     <div class="container">
       <h2 id="results-title" class="section-title"></h2>
       <p id="results-subtitle" class="section-subtitle"></p>
       <div class="card mt-4">
         <h3>Overall Performance</h3>
-        <p id="final-score" class="text-center" style="font-size: 3rem; font-weight: bold; color: var(--primary-color); margin-top: 1rem;"></p>
-        <p id="passing-status" class="text-center" style="font-size: 1.25rem; font-weight: 600;"></p>
+        <p id="final-score" class="text-center"></p>
+        <p id="passing-status" class="text-center"></p>
         <div id="results-details" class="mt-4 flex flex-col gap-2"></div>
         <div id="performance-analysis" class="mt-4"></div>
         <div class="action-buttons mt-4">
@@ -139,6 +142,7 @@
     </div>
   </div>
 
+  <!-- Review -->
   <div id="screen-review" class="screen hidden">
     <div class="container">
       <h2 id="review-title" class="section-title"></h2>
@@ -159,6 +163,7 @@
     </div>
   </div>
 
+  <!-- Custom Exam -->
   <div id="screen-custom-exam" class="screen hidden">
     <div class="container">
       <h2 class="section-title">Custom Exam Builder</h2>
@@ -239,19 +244,19 @@
           </select>
         </div>
         <label class="flex items-center justify-between">
-          <span class="font-weight-600">Show Exam Timer</span>
+          <span>Show Exam Timer</span>
           <input type="checkbox" id="show-timer">
         </label>
         <label class="flex items-center justify-between">
-          <span class="font-weight-600">Show Question Progress</span>
+          <span>Show Question Progress</span>
           <input type="checkbox" id="show-progress">
         </label>
         <label class="flex items-center justify-between">
-          <span class="font-weight-600">Randomize Questions</span>
+          <span>Randomize Questions</span>
           <input type="checkbox" id="randomize-questions-setting">
         </label>
         <label class="flex items-center justify-between">
-          <span class="font-weight-600">Show Difficulty Rating</span>
+          <span>Show Difficulty Rating</span>
           <input type="checkbox" id="show-difficulty">
         </label>
       </div>
@@ -284,4 +289,3 @@
   <script src="script.js"></script>
 </body>
 </html>
-
