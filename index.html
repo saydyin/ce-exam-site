@@ -1,123 +1,141 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" class="light">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Civil Engineering Exam Simulator</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <main class="screen" id="screen-main-menu">
+  <!-- MAIN MENU SCREEN -->
+  <main class="screen" id="screen-main-menu" aria-live="polite">
     <div class="container">
       <header class="header">
         <h1>Civil Engineering Exam Simulator</h1>
-        <p id="progress-text" class="text-muted">Select a section to begin or create a custom random exam.</p>
+        <p id="progress-text" class="text-muted">Select a section to preview or create a custom random exam.</p>
       </header>
 
-      <!-- Section cards -->
+      <!-- SECTION CARDS -->
       <div class="section-grid" id="section-cards">
-        <div class="section-card">
+        <div class="section-card" data-section="AMSTHEC">
           <div class="section-card-header">
             <div class="section-card-title">AMSTHEC</div>
-            <div class="section-card-score">75 Qs</div>
+            <div class="section-card-score" id="score-AMSTHEC">75 Qs</div>
           </div>
           <div class="section-card-description">Mathematics, Surveying & Transportation Engineering</div>
           <div class="action-buttons">
             <div class="nav-buttons">
-              <button class="btn btn-primary" data-section="AMSTHEC" id="btn-amsthec">Start</button>
-              <button class="btn btn-secondary" data-section="AMSTHEC" id="btn-amsthec-instructions">Instructions</button>
+              <button class="btn btn-primary btn-start" data-section="AMSTHEC">Start</button>
+              <button class="btn btn-secondary btn-instructions" data-section="AMSTHEC">Instructions</button>
             </div>
           </div>
         </div>
 
-        <div class="section-card">
+        <div class="section-card" data-section="HPGE">
           <div class="section-card-header">
             <div class="section-card-title">HPGE</div>
-            <div class="section-card-score">50 Qs</div>
+            <div class="section-card-score" id="score-HPGE">50 Qs</div>
           </div>
           <div class="section-card-description">Hydraulics & Geotechnical Engineering</div>
           <div class="action-buttons">
             <div class="nav-buttons">
-              <button class="btn btn-primary" data-section="HPGE" id="btn-hpge">Start</button>
-              <button class="btn btn-secondary" data-section="HPGE" id="btn-hpge-instructions">Instructions</button>
+              <button class="btn btn-primary btn-start" data-section="HPGE">Start</button>
+              <button class="btn btn-secondary btn-instructions" data-section="HPGE">Instructions</button>
             </div>
           </div>
         </div>
 
-        <div class="section-card">
+        <div class="section-card" data-section="PSAD">
           <div class="section-card-header">
             <div class="section-card-title">PSAD</div>
-            <div class="section-card-score">75 Qs</div>
+            <div class="section-card-score" id="score-PSAD">75 Qs</div>
           </div>
           <div class="section-card-description">Structural Design & Construction</div>
           <div class="action-buttons">
             <div class="nav-buttons">
-              <button class="btn btn-primary" data-section="PSAD" id="btn-psad">Start</button>
-              <button class="btn btn-secondary" data-section="PSAD" id="btn-psad-instructions">Instructions</button>
+              <button class="btn btn-primary btn-start" data-section="PSAD">Start</button>
+              <button class="btn btn-secondary btn-instructions" data-section="PSAD">Instructions</button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Custom Exam Button (placed below section cards) -->
+      <!-- CUSTOM EXAM AREA (below section cards) -->
       <div id="custom-exam-area" class="mt-4">
-        <!-- injected by script.js -->
+        <!-- rendered via script.js -->
       </div>
 
-      <!-- Answer distribution card (main menu only) -->
-      <div class="card" id="answer-distribution-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
-          <div style="font-weight:700">Answer Distribution (question_bank.json)</div>
-          <div class="text-muted" id="ad-total">Total questions: 0</div>
+      <!-- ANSWER DISTRIBUTION (MAIN MENU) -->
+      <div class="card" id="answer-distribution-card" aria-label="Answer distribution">
+        <div class="distribution-header">
+          <div style="font-weight:700">Answer Distribution (from question_bank.json)</div>
+          <div class="text-muted" id="ad-total">Total: 0</div>
         </div>
-
-        <div class="distribution-stats" id="distribution-stats">
-          <!-- Bars go here -->
-        </div>
+        <div id="distribution-stats" class="distribution-stats" role="region" aria-live="polite"></div>
       </div>
 
-      <!-- Main menu navigation footer -->
+      <!-- Footer nav -->
       <div class="nav-footer flex justify-between mt-4">
-        <div>
+        <div class="left">
           <button class="btn btn-text" id="btn-settings">Settings</button>
-          <button class="btn btn-text" id="btn-instructions">Instructions</button>
+          <button class="btn btn-text" id="btn-instructions-global">Instructions</button>
           <button class="btn btn-text" id="btn-results">Results</button>
         </div>
-        <div>
-          <span class="feature-badge">v1.0</span>
+        <div class="right">
+          <span class="feature-badge">v2.0</span>
         </div>
       </div>
     </div>
   </main>
 
-  <!-- Custom exam builder screen (hidden by default) -->
-  <section class="screen hidden" id="screen-custom-exam">
+  <!-- CUSTOM EXAM BUILDER SCREEN -->
+  <section class="screen hidden" id="screen-custom-exam" aria-hidden="true">
     <div class="container">
-      <h2 class="section-title">Custom Random Exam</h2>
+      <h2 class="section-title">Custom Random Exam Builder</h2>
+
       <div class="card">
         <label for="questionCount">Number of Questions (10–200, step 5)</label>
-        <input type="number" id="questionCount" min="10" max="200" step="5" value="50" class="mt-2 p-2 rounded-lg" />
-        <p class="text-muted mt-2" id="timeDisplay">Time: 0h 0m</p>
-        <div class="nav-buttons mt-4">
-          <button id="generateExamBtn" class="btn btn-primary">Generate Exam</button>
-          <button id="ce-back" class="btn btn-secondary">Back</button>
+        <input type="number" id="questionCount" min="10" max="200" step="5" value="50" class="mt-2 control-input" />
+        <p id="timeDisplay" class="text-muted mt-2">Time: —</p>
+
+        <div class="mt-4 nav-buttons">
+          <button id="generateExamBtn" class="btn btn-primary">Generate & Preview</button>
+          <button id="exportExamBtn" class="btn btn-secondary">Export JSON</button>
+          <button id="customBackBtn" class="btn btn-text">Back</button>
+        </div>
+
+        <div id="previewArea" class="mt-4">
+          <!-- preview table inserted here -->
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Minimal instructions & settings placeholders -->
-  <section class="screen hidden" id="screen-instructions">
+  <!-- INSTRUCTIONS SCREEN -->
+  <section class="screen hidden" id="screen-instructions" aria-hidden="true">
     <div class="container">
       <h2 class="section-title">Instructions</h2>
       <div class="card">
         <ol class="instructions-list">
-          <li>Read each question carefully.</li>
-          <li>Choose the best answer from the choices provided.</li>
-          <li>Custom exams preserve groupings and "Situation" placement.</li>
+          <li>Use the sections to begin or create a custom exam below the cards.</li>
+          <li>Custom exams preserve groupings and “Situation” placement.</li>
+          <li>Time for custom exams = 22.5 minutes per 5 questions.</li>
         </ol>
         <div class="nav-buttons mt-4">
-          <button id="ins-back" class="btn btn-secondary">Back</button>
+          <button id="insBackBtn" class="btn btn-text">Back</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS SCREEN (kept minimal but functional) -->
+  <section class="screen hidden" id="screen-results" aria-hidden="true">
+    <div class="container">
+      <h2 class="section-title">Results (placeholder)</h2>
+      <div class="card">
+        <p class="text-muted">This project focuses on the randomizer & distribution — results view is minimal.</p>
+        <div class="nav-buttons mt-4">
+          <button id="resultsBackBtn" class="btn btn-text">Back</button>
         </div>
       </div>
     </div>
