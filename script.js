@@ -1,4 +1,4 @@
-/// ======================
+// ======================
 // CONFIGURATION
 // ======================
 const SECTIONS = {
@@ -1631,4 +1631,3 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Prevent default form submission
     document.querySelector('form')?.addEventListener('submit', (e) => e.preventDefault());
 });
-
