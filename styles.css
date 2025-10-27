@@ -1,4 +1,4 @@
-//* ===== RESET & BASE STYLES ===== */
+/* ===== RESET & BASE STYLES ===== */
 * {
     margin: 0;
     padding: 0;
@@ -48,7 +48,6 @@ body.font-large {
 body.nav-step {
     overflow-x: hidden;
 }
-
 /* ===== UTILITY CLASSES ===== */
 .hidden {
     display: none !important;
@@ -145,7 +144,6 @@ body.nav-step {
     background: var(--primary-hover);
     cursor: pointer;
 }
-
 /* ===== CARD COMPONENT ===== */
 .card {
     background: var(--bg-card-light);
@@ -157,7 +155,6 @@ body.nav-step {
 .dark .card {
     background: var(--bg-card-dark);
 }
-
 /* ===== BUTTON COMPONENT ===== */
 .btn {
     display: -webkit-inline-box;
@@ -240,7 +237,6 @@ body.nav-step {
     *stroke: currentColor;
     *fill: none;
 }
-
 /* ===== LOADING SCREEN ===== */
 .loading-container {
     display: -webkit-box;
@@ -271,7 +267,6 @@ body.nav-step {
     0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
     100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
 }
-
 /* ===== MAIN MENU ===== */
 .header {
     text-align: center;
@@ -423,7 +418,6 @@ body.nav-step {
 .nav-buttons > * {
     margin: 0.5rem;
 }
-
 /* ===== INSTRUCTIONS SCREEN ===== */
 .section-title {
     font-size: 1.5rem;
@@ -480,7 +474,6 @@ body.nav-step {
 .dark .quote {
     color: var(--text-muted-dark);
 }
-
 /* ===== EXAM SCREEN ===== */
 .exam-header {
     background: var(--bg-card-light);
@@ -674,7 +667,6 @@ body.nav-step {
     flex: 1;
     white-space: pre-wrap;
 }
-
 /* User Selection States */
 .choice-btn.selected {
     border-color: var(--primary-color);
@@ -689,7 +681,6 @@ body.nav-step {
 .choice-btn.selected .choice-letter {
     color: var(--primary-color);
 }
-
 /* Review Mode States */
 .review-mode .choice-btn.correct {
     background: #d1fae5; /* green-100 */
@@ -717,13 +708,11 @@ body.nav-step {
 .review-mode .choice-btn.incorrect.selected .choice-letter {
     color: var(--danger-color);
 }
-
 /* Flagged State */
 .question-card.flagged {
     border: 2px solid var(--warning-color);
     box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.5);
 }
-
 /* Note Section */
 .note-container {
     margin-top: 1.5rem;
@@ -761,7 +750,6 @@ body.nav-step {
     border-color: #4b5563;
     color: var(--text-dark);
 }
-
 /* Solution Section (Review Mode) */
 .solution-container {
     margin-top: 1.5rem;
@@ -789,7 +777,6 @@ body.nav-step {
 .dark .solution-text {
     color: #f9fafb; /* light gray */
 }
-
 /* Footer & Navigation */
 .exam-footer {
     background: var(--bg-card-light);
@@ -824,7 +811,6 @@ body.nav-step {
     padding: 0.375rem 0.75rem;
     font-size: 0.75rem;
 }
-
 /* Step Navigation Mode */
 body.nav-step .question-card {
     display: none;
@@ -853,7 +839,6 @@ body.nav-step .exam-footer .container {
 body.nav-step .exam-footer .container > * {
     margin: 0.5rem;
 }
-
 /* Step Mode overrides for buttons */
 body.nav-step .exam-footer #btn-flag-question,
 body.nav-step .exam-footer #btn-submit-exam,
@@ -866,7 +851,6 @@ body.nav-step .exam-footer #btn-next-question {
     display: -ms-inline-flexbox !important;
     display: inline-flex !important;
 }
-
 /* Hide navigation in scroll mode unless needed */
 body:not(.nav-step) .exam-footer #btn-previous-question,
 body:not(.nav-step) .exam-footer #btn-next-question {
@@ -877,7 +861,6 @@ body:not(.nav-step) .exam-footer #btn-submit-exam {
     display: -ms-inline-flexbox !important;
     display: inline-flex !important;
 }
-
 /* Modal */
 .modal-overlay {
     position: fixed;
@@ -962,14 +945,12 @@ body:not(.nav-step) .exam-footer #btn-submit-exam {
     width: 1.5rem;
     height: 1.5rem;
 }
-
 /* Focus Styling */
 :focus-visible {
     outline: 2px solid var(--primary-color);
     /* Fallback for browsers that don't support outline-offset */
     *outline-offset: 2px;
 }
-
 /* Accessibility */
 .sr-only {
     position: absolute;
@@ -982,7 +963,6 @@ body:not(.nav-step) .exam-footer #btn-submit-exam {
     white-space: nowrap;
     border-width: 0;
 }
-
 /* Media Queries */
 @media (max-width: 640px) {
     .header h1 {
@@ -992,7 +972,6 @@ body:not(.nav-step) .exam-footer #btn-submit-exam {
         font-size: 1.25rem;
         padding: 0.4rem 0.8rem;
     }
-    
     .action-buttons {
         -webkit-box-orient: vertical;
         -webkit-box-direction: normal;
@@ -1000,40 +979,32 @@ body:not(.nav-step) .exam-footer #btn-submit-exam {
         flex-direction: column;
         width: 100%;
     }
-    
     .nav-buttons {
         width: 100%;
     }
-    
     .btn {
         width: 100%;
         max-width: none;
     }
-    
     .btn-sm {
         font-size: 0.7rem;
         padding: 0.3rem 0.6rem;
     }
-    
     .btn-lg {
         font-size: 0.9rem;
         padding: 0.5rem 1.5rem;
     }
-    
     .exam-content {
         padding-bottom: 4rem; /* Extra space for footer */
     }
-    
     /* Hide jump button on mobile in step mode */
     .nav-step .exam-footer #btn-jump-to-first {
         display: none;
     }
-    
     /* Better mobile question layout */
     .question-stem {
         font-size: 0.95rem;
     }
-    
     .choices-container {
         -moz-gap: 0.5rem;
         -webkit-box-gap: 0.5rem;
@@ -1044,12 +1015,10 @@ body:not(.nav-step) .exam-footer #btn-submit-exam {
     .choices-container > * {
         margin: 0.25rem;
     }
-    
     .choice-btn {
         padding: 0.6rem 0.8rem;
         font-size: 0.95rem;
     }
-    
     .exam-header .container {
         -webkit-box-orient: vertical;
         -webkit-box-direction: normal;
@@ -1064,20 +1033,17 @@ body:not(.nav-step) .exam-footer #btn-submit-exam {
     .exam-header .container > * {
         margin: 0.25rem;
     }
-    
     .exam-info {
         text-align: center;
         /* Fallback for IE */
         *text-align: center;
     }
-    
     .exam-controls {
         width: 100%;
         -webkit-box-pack: center;
         -ms-flex-pack: center;
         justify-content: center;
     }
-
     .nav-step .exam-footer .container {
         padding: 0 0.5rem;
         -moz-gap: 0.5rem;
