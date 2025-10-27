@@ -1,33 +1,27 @@
-//hello
 <!DOCTYPE html>
 <html lang="en" class="light">
 <head>
-  <meta charset="utf-8" /> 
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google-adsense-account" content="ca-pub-6901549244369608">
   <title>Civil Engineering Exam Simulator</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
-  
   <link rel="stylesheet" href="styles.css">
-
 </head>
 <body>
-
   <div id="screen-loading" class="screen loading-container">
     <div class="spinner"></div>
     <p class="mt-4 text-muted">Loading exam data...</p>
   </div>
 
   <div id="screen-main-menu" class="screen hidden">
+    <!-- Main menu content -->
     <div class="container screen">
       <div class="header">
         <h1>Civil Engineering Exam Simulator</h1>
         <p id="progress-text"></p>
       </div>
-
-      <div id="section-grid-container" class="section-grid">
-        </div>
-      
+      <div id="section-grid-container" class="section-grid"></div>
       <div class="action-buttons">
         <button type="button" id="btn-start-full-exam" class="btn btn-lg btn-primary">Start Full Mock Exam (200 Questions)</button>
         <div class="nav-buttons">
@@ -35,7 +29,6 @@
           <button type="button" id="btn-view-results" class="btn btn-secondary" disabled>View Past Results</button>
         </div>
       </div>
-
       <div class="card mt-4">
         <div class="flex items-center justify-between">
           <span class="text-muted">Settings & Reset</span>
@@ -59,23 +52,18 @@
     </div>
   </div>
 
+  <!-- Other screens: instructions, exam, results, review, custom-exam -->
   <div id="screen-instructions" class="screen hidden">
     <div class="container">
       <h2 id="instructions-section-title" class="section-title"></h2>
       <h3 id="instructions-section-subtitle" class="section-subtitle"></h3>
-      
       <div class="card mt-4">
         <div class="instructions-box">
           <p class="instructions-title">PRC Exam Instructions</p>
-          <ul id="prc-instructions-list" class="instructions-list">
-            </ul>
+          <ul id="prc-instructions-list" class="instructions-list"></ul>
         </div>
-
         <p id="motivational-quote" class="quote"></p>
-
-        <div id="exam-details" class="mt-4 flex flex-col gap-2">
-          </div>
-
+        <div id="exam-details" class="mt-4 flex flex-col gap-2"></div>
         <div class="action-buttons mt-4">
           <button type="button" id="btn-start-exam" class="btn btn-lg btn-primary">Start Exam</button>
           <button type="button" id="btn-back-to-menu" class="btn btn-secondary">Back to Main Menu</button>
@@ -103,8 +91,7 @@
       </div>
     </div>
     <div id="exam-content" class="exam-content">
-      <div class="questions-container">
-        </div>
+      <div class="questions-container"></div>
     </div>
     <div id="exam-footer" class="exam-footer">
       <div class="container">
@@ -138,15 +125,12 @@
     <div class="container">
       <h2 id="results-title" class="section-title"></h2>
       <p id="results-subtitle" class="section-subtitle"></p>
-
       <div class="card mt-4">
         <h3>Overall Performance</h3>
         <p id="final-score" class="text-center" style="font-size: 3rem; font-weight: bold; color: var(--primary-color); margin-top: 1rem;"></p>
         <p id="passing-status" class="text-center" style="font-size: 1.25rem; font-weight: 600;"></p>
-        <div id="results-details" class="mt-4 flex flex-col gap-2">
-          </div>
-        <div id="performance-analysis" class="mt-4">
-          </div>
+        <div id="results-details" class="mt-4 flex flex-col gap-2"></div>
+        <div id="performance-analysis" class="mt-4"></div>
         <div class="action-buttons mt-4">
           <button type="button" id="btn-review-exam" class="btn btn-primary">Review Exam</button>
           <button type="button" id="btn-results-back" class="btn btn-secondary">Back to Main Menu</button>
@@ -159,7 +143,6 @@
     <div class="container">
       <h2 id="review-title" class="section-title"></h2>
       <p id="review-subtitle" class="section-subtitle"></p>
-
       <div class="card mt-4">
         <div class="flex justify-between items-center mb-4">
           <p id="review-summary-text"></p>
@@ -168,9 +151,7 @@
             <button type="button" id="btn-review-nav-mode" class="btn btn-secondary btn-sm">Change View</button>
           </div>
         </div>
-        
         <div id="review-questions-container" class="review-questions-container"></div>
-        
         <div class="action-buttons mt-4">
           <button type="button" id="btn-review-back" class="btn btn-secondary">Back to Main Menu</button>
         </div>
@@ -182,7 +163,6 @@
     <div class="container">
       <h2 class="section-title">Custom Exam Builder</h2>
       <p class="section-subtitle">Select sections, number of questions, and difficulty.</p>
-
       <div class="card mt-4 flex-col gap-4">
         <h3>Sections to Include</h3>
         <div class="flex flex-col gap-2">
@@ -200,7 +180,6 @@
           </label>
         </div>
       </div>
-      
       <div class="card flex-col gap-4">
         <h3>Exam Parameters</h3>
         <div class="flex flex-col gap-2">
@@ -212,23 +191,19 @@
             <option value="hard">Hard Only</option>
           </select>
         </div>
-
         <div class="flex flex-col gap-2">
           <label for="question-count">Number of Questions: <span id="question-count-value">100</span></label>
           <input type="range" id="question-count" min="10" max="200" step="10" value="100">
         </div>
-
         <div class="flex flex-col gap-2">
           <label for="time-limit">Time Limit: <span id="time-limit-value">4 hours</span></label>
           <input type="range" id="time-limit" min="1" max="8" step="1" value="4">
         </div>
-
         <label class="flex items-center gap-2">
           <input type="checkbox" id="randomize-questions">
           Randomize Question Order
         </label>
       </div>
-
       <div class="action-buttons mt-4">
         <button type="button" id="btn-create-custom-exam" class="btn btn-lg btn-primary">Create Custom Exam</button>
         <button type="button" id="btn-custom-exam-back" class="btn btn-secondary">Back to Main Menu</button>
@@ -236,7 +211,7 @@
     </div>
   </div>
 
-
+  <!-- Modals -->
   <div id="settings-modal" class="modal-overlay hidden">
     <div class="modal-content">
       <h2>App Settings</h2>
@@ -284,7 +259,6 @@
     </div>
   </div>
 
-
   <div id="confirm-modal" class="modal-overlay hidden">
     <div class="modal-content confirm-modal">
       <h2 id="confirm-title"></h2>
@@ -307,6 +281,6 @@
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
