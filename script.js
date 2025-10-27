@@ -1,5 +1,5 @@
 // ======================
-// CONFIGURATION
+/// CONFIGURATION
 // ======================
 const SECTIONS = {
     AMSTHEC: {
