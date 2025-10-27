@@ -2,7 +2,8 @@
 <html lang="en" class="light">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="google-adsense-account" content="ca-pub-6901549244369608">
   <title>Civil Engineering Exam Simulator</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
   <style>
@@ -1329,7 +1330,6 @@
   </style>
 </head>
 <body>
-  <!-- Loading Screen -->
   <div id="screen-loading" class="screen">
     <div class="loading-container">
       <div class="spinner"></div>
@@ -1338,7 +1338,6 @@
     </div>
   </div>
 
-  <!-- Main Menu -->
   <div id="screen-main-menu" class="screen hidden">
     <div class="container">
       <div class="header">
@@ -1362,7 +1361,6 @@
     </div>
   </div>
 
-  <!-- Custom Exam Builder -->
   <div id="screen-custom-exam" class="screen hidden">
     <div class="container">
       <div class="card">
@@ -1419,7 +1417,7 @@
           <div class="section-card">
             <div class="flex flex-col md:flex-row gap-4">
               <div class="w-full md:w-1/2">
-                <label class="block mb-1">Number of Questions</label>
+                <label for="question-count" class="block mb-1">Number of Questions</label>
                 <input type="range" id="question-count" min="10" max="200" value="100" class="w-full">
                 <div class="flex justify-between text-sm">
                   <span>10</span>
@@ -1428,7 +1426,7 @@
                 </div>
               </div>
               <div class="w-full md:w-1/2">
-                <label class="block mb-1">Time Limit (hours)</label>
+                <label for="time-limit" class="block mb-1">Time Limit (hours)</label>
                 <input type="range" id="time-limit" min="1" max="10" value="4" class="w-full">
                 <div class="flex justify-between text-sm">
                   <span>1 hour</span>
@@ -1448,7 +1446,6 @@
     </div>
   </div>
 
-  <!-- Instructions Screen -->
   <div id="screen-instructions" class="screen hidden">
     <div class="container">
       <div class="card">
@@ -1470,7 +1467,6 @@
     </div>
   </div>
 
-  <!-- Exam Screen -->
   <div id="screen-exam" class="screen hidden">
     <header class="exam-header">
       <div class="container">
@@ -1504,7 +1500,6 @@
     </footer>
   </div>
 
-  <!-- Settings Screen -->
   <div id="screen-settings" class="screen hidden">
     <div class="container">
       <div class="card">
@@ -1569,7 +1564,6 @@
     </div>
   </div>
 
-  <!-- Results Screen -->
   <div id="screen-results" class="screen hidden">
     <div class="container results-container">
       <div class="results-card">
@@ -1590,7 +1584,6 @@
         </div>
       </div>
       
-      <!-- New: Performance Heatmap -->
       <div class="card mt-4">
         <h2 class="section-title">Performance Heatmap</h2>
         <p>Identify your strongest and weakest areas</p>
@@ -1607,7 +1600,6 @@
         </div>
       </div>
       
-      <!-- New: Study Focus Generator -->
       <div class="card mt-4">
         <h2 class="section-title">Study Focus Recommendations</h2>
         <p class="text-muted">Based on your performance, here's what to focus on next</p>
@@ -1622,7 +1614,6 @@
     </div>
   </div>
 
-  <!-- Review Screen -->
   <div id="screen-review" class="screen hidden">
     <div class="container">
       <div class="card">
@@ -1658,12 +1649,10 @@
             </div>
           </div>
           
-          <!-- New: Answer Pattern Analysis -->
           <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
             <h3 class="font-bold mb-2">Answer Pattern Analysis</h3>
             <div id="answer-patterns" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <!-- Will be populated dynamically -->
-            </div>
+              </div>
           </div>
         </div>
         
@@ -1676,7 +1665,6 @@
     </div>
   </div>
 
-  <!-- Confirmation Modal -->
   <div id="confirm-modal" class="modal-overlay hidden">
     <div class="modal-content confirm-modal">
       <h2 id="confirm-title"></h2>
@@ -1688,7 +1676,6 @@
     </div>
   </div>
 
-  <!-- Image Modal -->
   <div id="image-modal" class="modal-overlay hidden">
     <div class="modal-content">
       <button type="button" id="close-image-modal" class="modal-close" aria-label="Close image">
@@ -1700,7 +1687,6 @@
     </div>
   </div>
 
-  <!-- PDF Container (for printing) -->
   <div id="pdf-container" class="printable-container"></div>
 
   <script src="script.js"></script>
