@@ -1,146 +1,347 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en" class="light">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="google-adsense-account" content="ca-pub-6901549244369608">
   <title>Civil Engineering Exam Simulator</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
 </head>
 <body>
-  <!-- MAIN MENU SCREEN -->
-  <main class="screen" id="screen-main-menu" aria-live="polite">
+  <!-- Loading Screen -->
+  <div id="screen-loading" class="screen">
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <p>Preparing Your Exam...</p>
+      <p class="text-muted">Loading question bank and settings</p>
+    </div>
+  </div>
+
+  <!-- Main Menu -->
+  <div id="screen-main-menu" class="screen hidden">
     <div class="container">
-      <header class="header">
+      <div class="header">
         <h1>Civil Engineering Exam Simulator</h1>
-        <p id="progress-text" class="text-muted">Select a section to preview or create a custom random exam.</p>
-      </header>
-
-      <!-- SECTION CARDS -->
-      <div class="section-grid" id="section-cards">
-        <div class="section-card" data-section="AMSTHEC">
-          <div class="section-card-header">
-            <div class="section-card-title">AMSTHEC</div>
-            <div class="section-card-score" id="score-AMSTHEC">75 Qs</div>
-          </div>
-          <div class="section-card-description">Mathematics, Surveying & Transportation Engineering</div>
-          <div class="action-buttons">
-            <div class="nav-buttons">
-              <button class="btn btn-primary btn-start" data-section="AMSTHEC">Start</button>
-              <button class="btn btn-secondary btn-instructions" data-section="AMSTHEC">Instructions</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="section-card" data-section="HPGE">
-          <div class="section-card-header">
-            <div class="section-card-title">HPGE</div>
-            <div class="section-card-score" id="score-HPGE">50 Qs</div>
-          </div>
-          <div class="section-card-description">Hydraulics & Geotechnical Engineering</div>
-          <div class="action-buttons">
-            <div class="nav-buttons">
-              <button class="btn btn-primary btn-start" data-section="HPGE">Start</button>
-              <button class="btn btn-secondary btn-instructions" data-section="HPGE">Instructions</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="section-card" data-section="PSAD">
-          <div class="section-card-header">
-            <div class="section-card-title">PSAD</div>
-            <div class="section-card-score" id="score-PSAD">75 Qs</div>
-          </div>
-          <div class="section-card-description">Structural Design & Construction</div>
-          <div class="action-buttons">
-            <div class="nav-buttons">
-              <button class="btn btn-primary btn-start" data-section="PSAD">Start</button>
-              <button class="btn btn-secondary btn-instructions" data-section="PSAD">Instructions</button>
-            </div>
-          </div>
-        </div>
+        <p id="progress-text">0/3 sections completed</p>
       </div>
 
-      <!-- CUSTOM EXAM AREA (below section cards) -->
-      <div id="custom-exam-area" class="mt-4">
-        <!-- rendered via script.js -->
+      <div class="action-buttons mb-4">
+        <button type="button" id="btn-custom-exam" class="btn btn-primary">🎯 Create Custom Exam</button>
       </div>
 
-      <!-- ANSWER DISTRIBUTION (MAIN MENU) -->
-      <div class="card" id="answer-distribution-card" aria-label="Answer distribution">
+      <div id="section-grid" class="section-grid"></div>
+
+      <!-- Answer Distribution Card -->
+      <div class="card mt-4">
         <div class="distribution-header">
           <div style="font-weight:700">Answer Distribution (from question_bank.json)</div>
           <div class="text-muted" id="ad-total">Total: 0</div>
         </div>
-        <div id="distribution-stats" class="distribution-stats" role="region" aria-live="polite"></div>
+        <div id="distribution-stats" class="distribution-stats"></div>
       </div>
 
-      <!-- Footer nav -->
-      <div class="nav-footer flex justify-between mt-4">
-        <div class="left">
-          <button class="btn btn-text" id="btn-settings">Settings</button>
-          <button class="btn btn-text" id="btn-instructions-global">Instructions</button>
-          <button class="btn btn-text" id="btn-results">Results</button>
+      <div class="action-buttons">
+        <div class="nav-buttons">
+          <button type="button" id="btn-settings" class="btn btn-secondary">⚙️ Settings</button>
+          <button type="button" id="btn-download-pdf" class="btn btn-secondary">📄 Download for Offline</button>
         </div>
-        <div class="right">
-          <span class="feature-badge">v2.0</span>
-        </div>
+        <button type="button" id="btn-reset" class="btn btn-danger">🗑️ Reset Exam Data</button>
       </div>
     </div>
-  </main>
+  </div>
 
-  <!-- CUSTOM EXAM BUILDER SCREEN -->
-  <section class="screen hidden" id="screen-custom-exam" aria-hidden="true">
+  <!-- Custom Exam Builder -->
+  <div id="screen-custom-exam" class="screen hidden">
     <div class="container">
-      <h2 class="section-title">Custom Random Exam Builder</h2>
-
       <div class="card">
-        <label for="questionCount">Number of Questions (10–200, step 5)</label>
-        <input type="number" id="questionCount" min="10" max="200" step="5" value="50" class="mt-2 control-input" />
-        <p id="timeDisplay" class="text-muted mt-2">Time: —</p>
-
-        <div class="mt-4 nav-buttons">
-          <button id="generateExamBtn" class="btn btn-primary">Generate & Preview</button>
-          <button id="exportExamBtn" class="btn btn-secondary">Export JSON</button>
-          <button id="customBackBtn" class="btn btn-text">Back</button>
+        <h1 class="section-title">🎯 Create Custom Exam</h1>
+        <div class="mb-4">
+          <h2>Exam Configuration</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="section-card">
+              <h3 class="font-bold mb-2">Section Selection</h3>
+              <div class="flex flex-col gap-2">
+                <label class="flex items-center">
+                  <input type="checkbox" id="amsthec-include" class="mr-2" checked>
+                  <span>AMSTHEC (75 questions)</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="checkbox" id="hpge-include" class="mr-2" checked>
+                  <span>HPGE (50 questions)</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="checkbox" id="psad-include" class="mr-2" checked>
+                  <span>PSAD (75 questions)</span>
+                </label>
+              </div>
+            </div>
+            <div class="section-card">
+              <h3 class="font-bold mb-2">Exam Options</h3>
+              <div class="flex flex-col gap-2">
+                <label class="flex items-center">
+                  <input type="checkbox" id="randomize-questions" class="mr-2" checked>
+                  <span>Randomize questions</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="checkbox" id="include-timer" class="mr-2" checked>
+                  <span>Include timer</span>
+                </label>
+                <div class="flex items-center">
+                  <label for="difficulty-filter" class="mr-2">Difficulty:</label>
+                  <select id="difficulty-filter" class="btn btn-secondary">
+                    <option value="all">All difficulties</option>
+                    <option value="easy">Easy only</option>
+                    <option value="medium">Medium only</option>
+                    <option value="hard">Hard only</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-
-        <div id="previewArea" class="mt-4">
-          <!-- preview table inserted here -->
+        <div class="mb-4">
+          <h2>Question Selection</h2>
+          <div class="section-card">
+            <div class="flex flex-col md:flex-row gap-4">
+              <div class="w-full md:w-1/2">
+                <label class="block mb-1">Number of Questions</label>
+                <input type="range" id="question-count" min="10" max="200" value="100" class="w-full">
+                <div class="flex justify-between text-sm">
+                  <span>10</span>
+                  <span id="question-count-value">100</span>
+                  <span>200</span>
+                </div>
+              </div>
+              <div class="w-full md:w-1/2">
+                <label class="block mb-1">Time Limit (hours)</label>
+                <input type="range" id="time-limit" min="1" max="10" value="4" class="w-full">
+                <div class="flex justify-between text-sm">
+                  <span>1 hour</span>
+                  <span id="time-limit-value">4 hours</span>
+                  <span>10 hours</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="action-buttons">
+          <button type="button" id="btn-custom-exam-back" class="btn btn-secondary">Back to Main Menu</button>
+          <button type="button" id="btn-create-custom-exam" class="btn btn-primary">Create Exam</button>
         </div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <!-- INSTRUCTIONS SCREEN -->
-  <section class="screen hidden" id="screen-instructions" aria-hidden="true">
+  <!-- Instructions Screen -->
+  <div id="screen-instructions" class="screen hidden">
     <div class="container">
-      <h2 class="section-title">Instructions</h2>
       <div class="card">
-        <ol class="instructions-list">
-          <li>Use the sections to begin or create a custom exam below the cards.</li>
-          <li>Custom exams preserve groupings and “Situation” placement.</li>
-          <li>Time for custom exams = 22.5 minutes per 5 questions.</li>
-        </ol>
-        <div class="nav-buttons mt-4">
-          <button id="insBackBtn" class="btn btn-text">Back</button>
+        <h1 class="section-title">Exam Instructions</h1>
+        <p id="instruction-section-title" class="section-subtitle"></p>
+        <div class="instructions-box">
+          <p class="instructions-title">Please read the following instructions carefully:</p>
+          <ul id="prc-instructions" class="instructions-list"></ul>
+        </div>
+        <div id="motivational-quote" class="quote"></div>
+        <div class="action-buttons">
+          <button type="button" id="btn-instructions-back" class="btn btn-secondary">Back to Main Menu</button>
+          <button type="button" id="btn-start-exam" class="btn btn-primary">Start Exam Section</button>
         </div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <!-- RESULTS SCREEN (kept minimal but functional) -->
-  <section class="screen hidden" id="screen-results" aria-hidden="true">
+  <!-- Exam Screen -->
+  <div id="screen-exam" class="screen hidden">
+    <header class="exam-header">
+      <div class="container">
+        <div class="exam-info">
+          <h1 id="exam-section-title"></h1>
+          <p id="exam-progress"></p>
+        </div>
+        <div class="exam-controls">
+          <div id="exam-timer" class="timer">05:00:00</div>
+          <button type="button" id="btn-pause-resume" class="btn btn-secondary">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6"></path>
+            </svg> Pause
+          </button>
+          <button type="button" id="btn-submit-exam" class="btn btn-primary">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg> Submit
+          </button>
+        </div>
+      </div>
+    </header>
+    <main class="exam-content">
+      <div id="exam-questions-container" class="questions-container"></div>
+    </main>
+    <footer class="exam-footer">
+      <div class="container">
+        <button type="button" id="btn-jump-to-first" class="btn btn-secondary btn-sm">Jump to first unanswered</button>
+        <button type="button" id="btn-nav-next" class="btn btn-primary btn-sm">Next Question</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Settings Screen -->
+  <div id="screen-settings" class="screen hidden">
     <div class="container">
-      <h2 class="section-title">Results (placeholder)</h2>
       <div class="card">
-        <p class="text-muted">This project focuses on the randomizer & distribution — results view is minimal.</p>
-        <div class="nav-buttons mt-4">
-          <button id="resultsBackBtn" class="btn btn-text">Back</button>
+        <h1 class="section-title">⚙️ Settings</h1>
+        <div class="settings-group">
+          <h2>Theme</h2>
+          <div class="theme-switcher">
+            <button type="button" id="theme-light" class="btn btn-secondary">☀️ Light</button>
+            <button type="button" id="theme-dark" class="btn btn-secondary">🌙 Dark</button>
+          </div>
+        </div>
+        <div class="settings-group">
+          <h2>Font Size</h2>
+          <div class="font-switcher">
+            <button type="button" id="font-small" class="btn btn-secondary btn-sm">A Small</button>
+            <button type="button" id="font-medium" class="btn btn-secondary">A Medium</button>
+            <button type="button" id="font-large" class="btn btn-secondary btn-lg">A Large</button>
+          </div>
+        </div>
+        <div class="settings-group">
+          <h2>Navigation Mode</h2>
+          <div class="nav-mode-switcher">
+            <button type="button" id="nav-scroll" class="btn btn-secondary">Scroll (Default)</button>
+            <button type="button" id="nav-step" class="btn btn-secondary">Step-by-step</button>
+          </div>
+        </div>
+        <div class="settings-group">
+          <h2>Exam Settings</h2>
+          <div class="data-options">
+            <button type="button" id="btn-auto-save" class="btn btn-secondary">
+              <span id="auto-save-status">✅</span> Auto-Save Answers
+            </button>
+            <button type="button" id="btn-show-timer" class="btn btn-secondary">
+              <span id="show-timer-status">✅</span> Show Timer
+            </button>
+            <button type="button" id="btn-randomize-questions" class="btn btn-secondary">
+              <span id="randomize-status">✅</span> Randomize Questions
+            </button>
+          </div>
+        </div>
+        <div class="settings-group">
+          <h2>Section Progress</h2>
+          <div class="data-options">
+            <button type="button" id="btn-show-progress" class="btn btn-secondary">
+              <span id="show-progress-status">✅</span> Show Progress Bar
+            </button>
+            <button type="button" id="btn-show-difficulty" class="btn btn-secondary">
+              <span id="show-difficulty-status">✅</span> Show Difficulty
+            </button>
+          </div>
+        </div>
+        <div class="action-buttons mt-4">
+          <button type="button" id="btn-settings-back" class="btn btn-secondary">Back to Main Menu</button>
         </div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <script src="script.js" defer></script>
+  <!-- Results Screen -->
+  <div id="screen-results" class="screen hidden">
+    <div class="container results-container">
+      <div class="results-card">
+        <h1 class="section-title">Exam Results</h1>
+        <p id="results-section-title"></p>
+        <p class="score-message" id="score-message"></p>
+        <div class="score" id="results-score">0%</div>
+        <div class="stats-grid">
+          <div class="stat-item"><span>Total Questions</span><div class="stat-value" id="total-questions">0</div></div>
+          <div class="stat-item"><span>Correct Answers</span><div class="stat-value text-green-500" id="correct-answers">0</div></div>
+          <div class="stat-item"><span>Wrong/Skipped</span><div class="stat-value text-red-500" id="wrong-answers">0</div></div>
+        </div>
+        <div class="action-buttons">
+          <button type="button" id="btn-results-main-menu" class="btn btn-secondary">Back to Main Menu</button>
+          <button type="button" id="btn-review-section" class="btn btn-primary">Review Answers</button>
+        </div>
+      </div>
+
+      <div class="wrong-answers-section" id="wrong-answers-section">
+        <h2>Review Incorrect Answers</h2>
+        <p class="text-center mb-4">Review your mistakes with explanations</p>
+        <div id="wrong-answers-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Review Screen -->
+  <div id="screen-review" class="screen hidden">
+    <div class="container">
+      <div class="card">
+        <div class="review-header">
+          <h1 id="review-section-title">Review Section</h1>
+          <p id="review-progress" class="text-muted"></p>
+        </div>
+        <div class="review-controls">
+          <div class="flex flex-col md:flex-row gap-4">
+            <div class="flex items-center">
+              <label for="review-filter" class="mr-2">Filter:</label>
+              <select id="review-filter" class="btn btn-secondary">
+                <option value="all">All Questions</option>
+                <option value="correct">Correct Only</option>
+                <option value="wrong">Wrong Only</option>
+                <option value="skipped">Skipped Only</option>
+                <option value="flagged">Flagged Only</option>
+              </select>
+            </div>
+            <div class="flex items-center">
+              <label for="review-difficulty" class="mr-2">Difficulty:</label>
+              <select id="review-difficulty" class="btn btn-secondary">
+                <option value="all">All Difficulties</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+            <div class="flex items-center flex-grow">
+              <label for="review-search" class="mr-2">Search:</label>
+              <input type="text" id="review-search" placeholder="Search questions..." class="btn btn-secondary flex-grow">
+            </div>
+          </div>
+        </div>
+        <div id="review-questions-container" class="review-questions-container"></div>
+        <div class="action-buttons mt-4">
+          <button type="button" id="btn-review-back" class="btn btn-secondary">Back to Main Menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div id="confirm-modal" class="modal-overlay hidden">
+    <div class="modal-content confirm-modal">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-message"></p>
+      <div class="modal-buttons">
+        <button type="button" id="btn-confirm-cancel" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="btn-confirm-ok" class="btn btn-primary">Yes, Proceed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Modal -->
+  <div id="image-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <button type="button" id="close-image-modal" class="modal-close" aria-label="Close image">
+        <svg class="icon" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+      <img id="zoomed-image" src="" alt="Zoomed figure" class="zoomed-image">
+    </div>
+  </div>
+
+  <!-- PDF Container (for printing) -->
+  <div id="pdf-container" class="printable-container"></div>
+
+  <script src="script.js"></script>
 </body>
 </html>
