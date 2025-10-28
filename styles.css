@@ -48,6 +48,7 @@ body.font-large {
 body.nav-step {
     overflow-x: hidden;
 }
+
 /* ===== UTILITY CLASSES ===== */
 .hidden {
     display: none !important;
@@ -117,6 +118,7 @@ body.nav-step {
     background: var(--primary-hover);
     cursor: pointer;
 }
+
 /* ===== CARD COMPONENT ===== */
 .card {
     background: var(--bg-card-light);
@@ -128,6 +130,7 @@ body.nav-step {
 .dark .card {
     background: var(--bg-card-dark);
 }
+
 /* ===== BUTTON COMPONENT ===== */
 .btn {
     display: inline-flex;
@@ -202,6 +205,7 @@ body.nav-step {
     stroke: currentColor;
     fill: none;
 }
+
 /* ===== LOADING SCREEN ===== */
 .loading-container {
     display: flex;
@@ -223,6 +227,7 @@ body.nav-step {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
 /* ===== MAIN MENU ===== */
 .header {
     text-align: center;
@@ -315,56 +320,6 @@ body.nav-step {
     justify-content: center;
 }
 
-/* ===== ANSWER DISTRIBUTION STYLES ===== */
-.distribution-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-}
-.distribution-stats {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-.dist-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-}
-.dist-label {
-    width: 32px;
-    font-weight: bold;
-}
-.dist-bar-wrap {
-    flex: 1;
-    height: 18px;
-    background: #e5e7eb;
-    border-radius: 9999px;
-    overflow: hidden;
-}
-.dark .dist-bar-wrap {
-    background: var(--border-dark);
-}
-.dist-bar {
-    height: 100%;
-    border-radius: 9999px;
-    transition: width 0.3s ease;
-}
-.bar-A { background: #60a5fa; }
-.bar-B { background: #34d399; }
-.bar-C { background: #fbbf24; }
-.bar-D { background: #f472b6; }
-.dist-count {
-    width: 80px;
-    text-align: right;
-    color: var(--text-muted-light);
-    font-size: 0.875rem;
-}
-.dark .dist-count {
-    color: var(--text-muted-dark);
-}
-
 /* ===== INSTRUCTIONS SCREEN ===== */
 .section-title {
     font-size: 1.5rem;
@@ -415,6 +370,7 @@ body.nav-step {
 .dark .quote {
     color: var(--text-muted-dark);
 }
+
 /* ===== EXAM SCREEN ===== */
 .exam-header {
     background: var(--bg-card-light);
@@ -568,6 +524,7 @@ body.nav-step {
 .dark .choice-btn.selected .choice-letter {
     color: #c084fc;
 }
+
 /* Exam Footer - Fixed for mobile */
 .exam-footer {
     position: fixed;
@@ -591,6 +548,7 @@ body.nav-step {
 .exam-footer.hidden {
     transform: translateY(100%);
 }
+
 /* Step Navigation Mode */
 .nav-step .question-card:not(.active-question) {
     display: none !important;
@@ -601,6 +559,7 @@ body.nav-step {
 .nav-step .exam-footer #btn-nav-next {
     display: inline-flex !important;
 }
+
 /* ===== RESULTS SCREEN ===== */
 .results-container {
     padding: 2rem 0;
@@ -704,6 +663,7 @@ body.nav-step {
     color: var(--primary-color);
     margin-bottom: 0.5rem;
 }
+
 /* ===== REVIEW SCREEN ===== */
 .review-header {
     display: flex;
@@ -778,6 +738,7 @@ body.nav-step {
 .review-question-card .explanation-title {
     color: var(--success-color);
 }
+
 /* ===== SETTINGS SCREEN ===== */
 .settings-group {
     margin-bottom: 2rem;
@@ -803,6 +764,7 @@ body.nav-step {
     gap: 0.75rem;
     flex-wrap: wrap;
 }
+
 /* ===== MODAL ===== */
 .modal-overlay {
     position: fixed;
@@ -885,6 +847,7 @@ body.nav-step {
     justify-content: center;
     gap: 1rem;
 }
+
 /* ===== PDF CONTAINER ===== */
 .printable-container {
     display: none;
@@ -895,25 +858,30 @@ body.nav-step {
     background: #fff;
     min-height: 100vh;
 }
+
 .printable-section {
     margin-bottom: 40px;
 }
+
 .printable-header {
     border-bottom: 1px solid #e5e7eb;
     padding-bottom: 15px;
     margin-bottom: 20px;
 }
+
 .printable-title {
     font-size: 1.5rem;
     font-weight: bold;
     text-align: center;
 }
+
 .printable-subtitle {
     font-size: 1.125rem;
     text-align: center;
     color: #6b7280;
     margin-top: 0.5rem;
 }
+
 .printable-question {
     background: #f9fafb;
     border: 1px solid #e5e7eb;
@@ -921,17 +889,21 @@ body.nav-step {
     padding: 1.5rem;
     margin-bottom: 2rem;
 }
+
 .printable-question h3 {
     font-size: 1.125rem;
     font-weight: 600;
     margin-top: 0;
 }
+
 .printable-stem {
     margin: 1rem 0;
 }
+
 .printable-choices {
     margin-top: 1.5rem;
 }
+
 .printable-choice {
     padding: 0.75rem;
     border: 1px solid #e5e7eb;
@@ -939,22 +911,26 @@ body.nav-step {
     margin-bottom: 0.5rem;
     background: #f3f4f6;
 }
+
 .printable-figure {
     text-align: center;
     margin: 1.5rem 0;
 }
+
 .printable-figure img {
     max-width: 100%;
     height: auto;
     border: 1px solid #e5e7eb;
     border-radius: 0.375rem;
 }
+
 .printable-explanation {
     margin-top: 1.5rem;
     padding: 1rem;
     background: #f0f9ff;
     border-left: 4px solid #3b82f6;
 }
+
 .printable-footer {
     border-top: 1px solid #e5e7eb;
     padding-top: 1.5rem;
@@ -963,12 +939,14 @@ body.nav-step {
     font-size: 0.875rem;
     color: #6b7280;
 }
+
 /* ===== PRINT STYLES ===== */
 @media print {
   /* Hide non-essential elements */
   body > *:not(.printable-container) {
     display: none !important;
   }
+  
   /* Container styles for print */
   .printable-container {
     padding: 1.5cm;
@@ -980,9 +958,11 @@ body.nav-step {
     width: 100% !important;
     max-width: 100% !important;
   }
+  
   .printable-section {
     page-break-before: always;
   }
+  
   .printable-question {
     page-break-inside: avoid;
     margin-bottom: 30px;
@@ -990,18 +970,22 @@ body.nav-step {
     border: 1px solid #e5e7eb;
     border-radius: 0;
   }
+  
   .printable-question h3 {
     font-size: 14pt;
     margin-top: 0;
   }
+  
   .printable-stem {
     margin: 15px 0;
     font-size: 12pt;
     line-height: 1.6;
   }
+  
   .printable-choices {
     margin: 20px 0;
   }
+  
   .printable-choice {
     padding: 8px 12px;
     margin: 5px 0;
@@ -1009,38 +993,45 @@ body.nav-step {
     border-radius: 4px;
     background: #f9fafb;
   }
+  
   .printable-figure {
     text-align: center;
     margin: 20px 0;
     page-break-inside: avoid;
   }
+  
   .printable-figure img {
     max-width: 100%;
     height: auto;
     border: 1px solid #e5e7eb;
     border-radius: 4px;
   }
+  
   .printable-explanation {
     margin-top: 20px;
     padding: 12px;
     background: #f0f9ff;
     border-left: 4px solid #3b82f6;
   }
+  
   .printable-header {
     border-bottom: 1px solid #e5e7eb;
     padding-bottom: 15px;
     margin-bottom: 20px;
     text-align: center;
   }
+  
   .printable-title {
     font-size: 18pt;
     font-weight: bold;
     margin-bottom: 5px;
   }
+  
   .printable-subtitle {
     font-size: 14pt;
     color: #4b5563;
   }
+  
   .printable-footer {
     border-top: 1px solid #e5e7eb;
     padding-top: 15px;
@@ -1049,16 +1040,19 @@ body.nav-step {
     font-size: 10pt;
     color: #6b7280;
   }
+  
   /* Hide elements not needed in print */
   .printable-container .no-print {
     display: none !important;
   }
 }
+
 /* ===== ACCESSIBILITY & MOBILE OPTIMIZATIONS ===== */
 :focus-visible {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
 }
+
 /* Review Screen Enhancements */
 .review-controls {
     margin-bottom: 1.5rem;
@@ -1071,6 +1065,7 @@ body.nav-step {
     border: 1px solid var(--border-light);
     border-radius: var(--radius);
 }
+
 /* ===== NEW FEATURES ===== */
 /* Feature 1: Progress Bar */
 .progress-bar-container {
@@ -1088,6 +1083,7 @@ body.nav-step {
     width: 0%;
     transition: width 0.3s ease;
 }
+
 /* Feature 2: Flagged Questions */
 .flagged-indicator {
     display: inline-block;
@@ -1101,6 +1097,7 @@ body.nav-step {
 .flagged-question .question-number {
     color: var(--warning-color);
 }
+
 /* Feature 3: Time Spent Indicator */
 .time-spent {
     font-size: 0.75rem;
@@ -1110,6 +1107,7 @@ body.nav-step {
 .dark .time-spent {
     color: var(--text-muted-dark);
 }
+
 /* Feature 4: Note-taking */
 .note-container {
     margin-top: 1rem;
@@ -1130,6 +1128,7 @@ body.nav-step {
     padding: 0.5rem;
     resize: vertical;
 }
+
 /* Feature 5: Question Filter */
 .filter-badge {
     background: var(--primary-color);
@@ -1140,12 +1139,14 @@ body.nav-step {
     font-weight: bold;
     margin-left: 5px;
 }
+
 /* Feature 6: Question Highlighting */
 .highlighted {
     background-color: #f0f9ff;
     border-left: 4px solid var(--primary-color);
     padding-left: 1rem;
 }
+
 /* Feature 7: Difficulty Rating */
 .difficulty-badge {
     display: inline-block;
@@ -1167,6 +1168,7 @@ body.nav-step {
     background: #fca5a5;
     color: #991b1b;
 }
+
 /* Feature 8: Answer Pattern Analysis */
 .answer-pattern {
     padding: 0.5rem;
@@ -1181,6 +1183,7 @@ body.nav-step {
     font-size: 0.875rem;
     color: var(--text-muted-light);
 }
+
 /* Feature 9: Study Focus Generator */
 .study-focus-item {
     padding: 0.75rem;
@@ -1199,6 +1202,7 @@ body.nav-step {
     background: #fef3c7;
     border-color: var(--warning-color);
 }
+
 /* Feature 10: Performance Stats */
 .stats-grid {
     display: grid;
@@ -1220,77 +1224,96 @@ body.nav-step {
     font-weight: bold;
     margin-top: 0.25rem;
 }
+
 /* ===== MOBILE OPTIMIZATIONS ===== */
 @media (max-width: 768px) {
     .exam-footer {
         padding: 0.6rem 0;
     }
+    
     .exam-controls {
         flex-direction: column;
         align-items: flex-end;
         gap: 0.5rem;
     }
+    
     .timer {
         font-size: 1.25rem;
         padding: 0.4rem 0.8rem;
     }
+    
     .action-buttons {
         flex-direction: column;
         width: 100%;
     }
+    
     .nav-buttons {
         width: 100%;
     }
+    
     .btn {
         width: 100%;
         max-width: none;
     }
+    
     .btn-sm {
         font-size: 0.7rem;
         padding: 0.3rem 0.6rem;
     }
+    
     .btn-lg {
         font-size: 0.9rem;
         padding: 0.5rem 1.5rem;
     }
+    
     .exam-content {
         padding-bottom: 4rem; /* Extra space for footer */
     }
+    
     /* Hide jump button on mobile in step mode */
     .nav-step .exam-footer #btn-jump-to-first {
         display: none;
     }
+    
     /* Better mobile question layout */
     .question-stem {
         font-size: 0.95rem;
     }
+    
     .choices-container {
         gap: 0.5rem;
     }
+    
     .choice-btn {
         padding: 0.6rem 0.8rem;
         font-size: 0.9rem;
     }
+    
     /* Mobile-specific review features */
     .review-controls {
         flex-direction: column;
         gap: 0.5rem;
     }
+    
     .review-controls select,
     .review-controls input {
         max-width: 100%;
     }
+    
     /* PDF Container Mobile */
     .printable-container {
         padding: 1.5cm;
         font-size: 10pt;
     }
+    
     .printable-title {
         font-size: 16pt;
     }
+    
     .printable-question h3 {
         font-size: 12pt;
     }
+    
     .printable-stem {
         font-size: 10pt;
     }
