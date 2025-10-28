@@ -1,5 +1,5 @@
 /* ===== RESET & BASE STYLES ===== */
-* {
+{
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -1578,3 +1578,4 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('screen-loading').classList.add('hidden');
   showScreen('main-menu');
 });
+
