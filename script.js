@@ -152,127 +152,143 @@ function getQuestionsForSection(sectionName) {
     return processedQuestions.slice(0, requiredTotal);
 }
 
-// =========================
-// processQuestionsWithGroups.js
-// =========================
-// Universal handler for AMSTHEC, PSAD, and HPGE
-// Groups questions, applies limits, ensures "Situation:" prefix,
-// randomizes groups (default ON), and flattens back into a question list.
-
 function processQuestionsWithGroups(questions) {
-  if (!questions || !Array.isArray(questions)) return [];
+    // STEP 1: Identify all question groups
+    const groups = {};
+    questions.forEach((question, index) => {
+        const groupId = question.group_id || `standalone_${index}`;
+        if (!groups[groupId]) {
+            groups[groupId] = {
+                questions: [],
+                startIndex: index,
+                isSituation: false
+            };
+        }
+        groups[groupId].questions.push({...question, originalIndex: index});
+    });
 
-  // ===== STEP 1: Group questions by group_id =====
-  const groups = {};
-  questions.forEach((q, index) => {
-    const groupId = q.group_id || `standalone_${index}`;
-    if (!groups[groupId]) {
-      groups[groupId] = { questions: [], startIndex: index };
+    // STEP 2: Identify true situation groups
+    Object.values(groups).forEach(group => {
+        // Check if explicitly marked as situation
+        if (group.questions.some(q => q.stem?.trim().startsWith('Situation'))) {
+            group.isSituation = true;
+            return;
+        }
+        
+        // Check if it's a sequential group with same group_id
+        if (group.questions.length >= 2) {
+            const firstQuestion = group.questions[0];
+            // Only mark as situation if it has meaningful context
+            if (firstQuestion.stem.length < 150) {
+                group.isSituation = true;
+            }
+        }
+    });
+
+    // STEP 3: Separate into situation groups and standalone questions
+    const situationGroups = Object.values(groups)
+        .filter(group => group.isSituation)
+        .sort((a, b) => a.startIndex - b.startIndex); // Maintain original order
+    
+    const standaloneQuestions = [];
+    Object.values(groups).forEach(group => {
+        if (!group.isSituation) {
+            standaloneQuestions.push(...group.questions);
+        }
+    });
+
+    // STEP 4: Apply section-specific limits
+    const sectionName = appState.currentSection;
+    let maxSituations = 20; // Default for AMSTHEC and PSAD
+    
+    if (sectionName === 'HPGE') {
+        maxSituations = 15;
     }
-    groups[groupId].questions.push({ ...q, originalIndex: index });
-  });
+    
+    // Apply limits to situation groups
+    const limitedSituations = situationGroups.slice(0, maxSituations);
+    
+    // STEP 5: Format situation groups properly
+    limitedSituations.forEach(group => {
+        const firstQuestion = group.questions[0];
+        if (!firstQuestion.stem?.trim().startsWith('Situation')) {
+            // Extract meaningful context from the first sentence
+            const firstSentence = firstQuestion.stem?.split(/[.!?]/)[0]?.trim() || 'Problem';
+            firstQuestion.stem = `Situation: ${firstSentence}. ${firstQuestion.stem}`;
+        }
+    });
 
-  // ===== STEP 2: Identify situation groups =====
-  const situationGroups = [];
-  const standaloneQuestions = [];
-
-  Object.values(groups).forEach(group => {
-    const isSituation =
-      group.questions.length >= 3 ||
-      group.questions.some(q => q.stem?.trim().startsWith("Situation"));
-
-    if (isSituation) situationGroups.push(group);
-    else standaloneQuestions.push(...group.questions);
-  });
-
-  // ===== STEP 3: Section-based limits =====
-  const sectionName = appState?.currentSection || "AMSTHEC";
-  let maxSituations = 20;
-  let maxStandalone = Infinity;
-
-  if (sectionName === "HPGE") {
-    maxSituations = 15;
-    maxStandalone = 5;
-  }
-
-  // ===== STEP 4: Format & limit situations =====
-  const limitedSituations = [];
-  for (let i = 0; i < situationGroups.length; i++) {
-    if (limitedSituations.length < maxSituations) {
-      const group = situationGroups[i];
-      const firstQ = group.questions[0];
-      if (!firstQ.stem?.trim().startsWith("Situation")) {
-        const topic = firstQ.stem?.split(".")[0]?.trim() || "Problem";
-        firstQ.stem = `Situation: ${topic}. ${firstQ.stem}`;
-      }
-      limitedSituations.push(group);
-    } else {
-      // if we're near the end and the next group would overflow slightly, still include it
-      const remaining = questions.length - countQuestions(limitedSituations);
-      if (remaining <= 3) limitedSituations.push(situationGroups[i]);
-      else break;
+    // STEP 6: Determine how many standalone questions to include
+    let maxStandalone = 10; // Default number of standalone questions
+    
+    if (sectionName === 'HPGE') {
+        maxStandalone = 5; // HPGE specifically needs 5 standalone questions
     }
-  }
-
-  // ===== STEP 5: Handle standalone questions =====
-  let selectedStandalones = [...standaloneQuestions];
-
-  if (sectionName === "HPGE") {
-    selectedStandalones = standaloneQuestions.slice(0, maxStandalone);
-
-    // if near the end, allow fewer/more (1–3) to fit properly
-    const remaining = 5 - selectedStandalones.length;
-    if (remaining > 0 && standaloneQuestions.length > selectedStandalones.length) {
-      const extras = standaloneQuestions.slice(
-        selectedStandalones.length,
-        selectedStandalones.length + remaining
-      );
-      selectedStandalones.push(...extras);
+    
+    // Limit standalone questions
+    const limitedStandalone = standaloneQuestions.slice(0, maxStandalone);
+    
+    // STEP 7: Create final groups array with proper mixing
+    const finalGroups = [];
+    
+    // Start with 2-3 situation groups
+    const initialSituations = Math.min(3, limitedSituations.length);
+    for (let i = 0; i < initialSituations; i++) {
+        finalGroups.push(limitedSituations[i]);
     }
-  }
+    
+    // Then alternate between standalone and situation groups
+    let sIndex = initialSituations;
+    let stIndex = 0;
+    
+    while (sIndex < limitedSituations.length || stIndex < limitedStandalone.length) {
+        // Add 1-2 standalone questions
+        const numStandalone = Math.min(2, limitedStandalone.length - stIndex);
+        for (let i = 0; i < numStandalone; i++) {
+            if (stIndex < limitedStandalone.length) {
+                finalGroups.push({
+                    questions: [limitedStandalone[stIndex++]],
+                    isStandalone: true
+                });
+            }
+        }
+        
+        // Add 1 situation group
+        if (sIndex < limitedSituations.length) {
+            finalGroups.push(limitedSituations[sIndex++]);
+        }
+    }
+    
+    // STEP 8: Apply randomization while preserving group integrity
+    const shouldRandomize = appState.settings.randomizeQuestions || 
+        (appState.view === 'custom-exam' && appState.customExam.randomize);
+    
+    if (shouldRandomize) {
+        // Randomize the groups but keep questions within groups together
+        shuffleArray(finalGroups);
+    }
 
-  // ===== STEP 6: Combine all groups =====
-  let finalGroups = [
-    ...limitedSituations,
-    ...selectedStandalones.map(q => ({ questions: [q], isStandalone: true }))
-  ];
+    // STEP 9: Flatten the groups back to a single array
+    const finalQuestions = [];
+    finalGroups.forEach(group => {
+        finalQuestions.push(...group.questions);
+    });
 
-  // ===== STEP 7: Randomize group order (default = true) =====
-  const randomizeEnabled =
-    (typeof appState?.settings?.randomizeQuestions === "boolean"
-      ? appState.settings.randomizeQuestions
-      : true) ||
-    (appState?.view === "custom-exam" && appState?.customExam?.randomize);
-
-  if (randomizeEnabled) {
-    finalGroups = shuffleArray(finalGroups);
-  }
-
-  // ===== STEP 8: Flatten into a final question array =====
-  const finalQuestions = [];
-  finalGroups.forEach(group => {
-    group.questions.forEach(q => finalQuestions.push(q));
-  });
-
-  // ===== STEP 9: Clean temporary data =====
-  return finalQuestions.map(({ originalIndex, ...rest }) => rest);
+    // STEP 10: Remove temporary properties
+    return finalQuestions.map(q => {
+        const {originalIndex, ...rest} = q;
+        return rest;
+    });
 }
 
-// ===== Helper: Fisher–Yates Shuffle =====
+// Helper function: Fisher-Yates shuffle
 function shuffleArray(array) {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
 }
-
-// ===== Helper: Count questions inside grouped structure =====
-function countQuestions(groups) {
-  return groups.reduce((total, g) => total + g.questions.length, 0);
-}
-
 
 // ======================
 // UTILITY FUNCTIONS
@@ -1903,5 +1919,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         form.addEventListener('submit', e => e.preventDefault());
     });
 });
-
-
