@@ -93,7 +93,7 @@ let appState = {
     questionTimes: JSON.parse(localStorage.getItem('examTimes')) || {},
     questionDifficulty: JSON.parse(localStorage.getItem('examDifficulty')) || {},
     performanceData: JSON.parse(localStorage.getItem('performanceData')) || {},
-    customExam: {
+    customExam: JSON.parse(localStorage.getItem('customExam')) || {
         sections: ['AMSTHEC', 'HPGE', 'PSAD'],
         randomize: true,
         difficulty: 'all',
@@ -114,15 +114,42 @@ async function loadQuestionBank() {
         }
         const questionBank = await response.json();
         console.log(`Loaded ${questionBank.length} questions from question bank`);
-        // Add difficulty ratings to questions
+        
+        // Convert difficulty numbers to strings and add missing fields
         questionBank.forEach(q => {
-            if (!q.difficulty) {
-                // Default difficulty based on section
-                if (q.section === 'AMSTHEC') q.difficulty = ['easy', 'medium', 'hard'][Math.floor(Math.random() * 3)];
-                else if (q.section === 'HPGE') q.difficulty = ['medium', 'hard', 'hard'][Math.floor(Math.random() * 3)];
-                else if (q.section === 'PSAD') q.difficulty = ['medium', 'medium', 'hard'][Math.floor(Math.random() * 3)];
+            // Convert difficulty number to string
+            if (q.difficulty === 1) q.difficulty = 'easy';
+            else if (q.difficulty === 2) q.difficulty = 'medium';
+            else if (q.difficulty === 3) q.difficulty = 'hard';
+            else q.difficulty = 'medium'; // default
+            
+            // Add missing id if not present
+            if (!q.id) {
+                q.id = `${q.section}-${Math.random().toString(36).substr(2, 9)}`;
+            }
+            
+            // Add explanation if missing
+            if (!q.explanation) {
+                q.explanation = "Refer to the solution for detailed explanation.";
+            }
+            
+            // Add topic if missing (extract from stem or use section)
+            if (!q.topic) {
+                // Try to extract topic from stem or use section
+                const stemLower = q.stem.toLowerCase();
+                if (stemLower.includes('calculus') || stemLower.includes('derivative')) q.topic = 'Calculus';
+                else if (stemLower.includes('algebra')) q.topic = 'Algebra';
+                else if (stemLower.includes('trigonometry') || stemLower.includes('angle')) q.topic = 'Trigonometry';
+                else if (stemLower.includes('geometry')) q.topic = 'Geometry';
+                else if (stemLower.includes('probability')) q.topic = 'Probability';
+                else if (stemLower.includes('surveying')) q.topic = 'Surveying';
+                else if (stemLower.includes('fluid') || stemLower.includes('hydraulics')) q.topic = 'Fluid Mechanics';
+                else if (stemLower.includes('soil') || stemLower.includes('geotechnical')) q.topic = 'Soil Mechanics';
+                else if (stemLower.includes('concrete') || stemLower.includes('steel')) q.topic = 'Structural Design';
+                else q.topic = q.section; // Fallback to section name
             }
         });
+        
         appState.fullQuestionBank = questionBank;
         return questionBank;
     } catch (error) {
@@ -504,51 +531,210 @@ function resetExam() {
 // CUSTOM EXAM BUILDER
 // ======================
 function renderCustomExamBuilder() {
-    // Set up initial values
-    document.getElementById('amsthec-include').checked = appState.customExam.sections.includes('AMSTHEC');
-    document.getElementById('hpge-include').checked = appState.customExam.sections.includes('HPGE');
-    document.getElementById('psad-include').checked = appState.customExam.sections.includes('PSAD');
-    document.getElementById('randomize-questions').checked = appState.customExam.randomize;
-    document.getElementById('include-timer').checked = true; // Always include timer for custom exams
-    document.getElementById('difficulty-filter').value = appState.customExam.difficulty;
-    document.getElementById('question-count').value = appState.customExam.questionCount;
-    document.getElementById('question-count-value').textContent = appState.customExam.questionCount;
-    const timeHours = Math.floor(appState.customExam.timeLimit / 3600);
-    document.getElementById('time-limit').value = timeHours;
-    document.getElementById('time-limit-value').textContent = `${timeHours} hours`;
-    // Set up event listeners
+    const container = document.querySelector('#screen-custom-exam .container');
+    container.innerHTML = `
+        <div class="card">
+            <h1 class="section-title">🎯 Create Custom Exam</h1>
+            
+            <!-- Quick Presets -->
+            <div class="mb-6">
+                <h2 class="text-lg font-bold mb-3">Quick Presets</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    <button type="button" class="btn btn-secondary preset-btn" data-questions="50" data-time="3">
+                        🎯 Mini Exam (50Q, 3H)
+                    </button>
+                    <button type="button" class="btn btn-secondary preset-btn" data-questions="100" data-time="4">
+                        📝 Standard (100Q, 4H)
+                    </button>
+                    <button type="button" class="btn btn-secondary preset-btn" data-questions="150" data-time="5">
+                        ⏱️ Full Length (150Q, 5H)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Section Selection -->
+            <div class="mb-6">
+                <h2 class="text-lg font-bold mb-3">Sections to Include</h2>
+                <div class="section-card grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary transition-colors section-option">
+                        <input type="checkbox" id="amsthec-include" class="mr-3 transform scale-125" checked>
+                        <div>
+                            <div class="font-semibold">📚 AMSTHEC</div>
+                            <div class="text-sm text-gray-600">75 questions available</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary transition-colors section-option">
+                        <input type="checkbox" id="hpge-include" class="mr-3 transform scale-125" checked>
+                        <div>
+                            <div class="font-semibold">📐 HPGE</div>
+                            <div class="text-sm text-gray-600">50 questions available</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary transition-colors section-option">
+                        <input type="checkbox" id="psad-include" class="mr-3 transform scale-125" checked>
+                        <div>
+                            <div class="font-semibold">🧱 PSAD</div>
+                            <div class="text-sm text-gray-600">75 questions available</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Exam Configuration -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <!-- Question Count -->
+                <div>
+                    <h2 class="text-lg font-bold mb-3">Number of Questions</h2>
+                    <div class="section-card">
+                        <input type="range" id="question-count" min="10" max="200" value="${appState.customExam.questionCount}" class="w-full mb-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Questions:</span>
+                            <span id="question-count-value" class="font-bold text-lg">${appState.customExam.questionCount}</span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>10</span>
+                            <span>200</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Time Limit -->
+                <div>
+                    <h2 class="text-lg font-bold mb-3">Time Limit</h2>
+                    <div class="section-card">
+                        <input type="range" id="time-limit" min="1" max="10" value="${Math.floor(appState.customExam.timeLimit / 3600)}" class="w-full mb-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Hours:</span>
+                            <span id="time-limit-value" class="font-bold text-lg">${Math.floor(appState.customExam.timeLimit / 3600)} hours</span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>1H</span>
+                            <span>10H</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Exam Options -->
+            <div class="mb-6">
+                <h2 class="text-lg font-bold mb-3">Exam Options</h2>
+                <div class="section-card space-y-3">
+                    <label class="flex items-center justify-between p-2">
+                        <span>Randomize Question Order</span>
+                        <input type="checkbox" id="randomize-questions" class="transform scale-125" ${appState.customExam.randomize ? 'checked' : ''}>
+                    </label>
+                    <label class="flex items-center justify-between p-2">
+                        <span>Show Timer During Exam</span>
+                        <input type="checkbox" id="include-timer" class="transform scale-125" checked>
+                    </label>
+                    <div class="flex items-center justify-between p-2">
+                        <span>Difficulty Level</span>
+                        <select id="difficulty-filter" class="btn btn-secondary btn-sm">
+                            <option value="all" ${appState.customExam.difficulty === 'all' ? 'selected' : ''}>All Levels</option>
+                            <option value="easy" ${appState.customExam.difficulty === 'easy' ? 'selected' : ''}>Easy Only</option>
+                            <option value="medium" ${appState.customExam.difficulty === 'medium' ? 'selected' : ''}>Medium Only</option>
+                            <option value="hard" ${appState.customExam.difficulty === 'hard' ? 'selected' : ''}>Hard Only</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary & Create -->
+            <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mb-6">
+                <h3 class="font-bold mb-2">Exam Summary</h3>
+                <div id="exam-summary" class="text-sm">
+                    <!-- Dynamically updated -->
+                </div>
+            </div>
+
+            <div class="action-buttons flex flex-col sm:flex-row gap-3">
+                <button type="button" id="btn-custom-exam-back" class="btn btn-secondary flex-1">← Back to Main Menu</button>
+                <button type="button" id="btn-create-custom-exam" class="btn btn-primary flex-1">🚀 Create Custom Exam</button>
+            </div>
+        </div>
+    `;
+
+    // Initialize values
+    updateCustomExamSummary();
+    
+    // Event listeners for sliders
     document.getElementById('question-count').oninput = function() {
         document.getElementById('question-count-value').textContent = this.value;
-        appState.customExam.questionCount = parseInt(this.value);
-        saveState();
+        updateCustomExamSummary();
     };
+    
     document.getElementById('time-limit').oninput = function() {
         const hours = parseInt(this.value);
-        document.getElementById('time-limit-value').textContent = `${hours} hours`;
-        appState.customExam.timeLimit = hours * 3600;
-        saveState();
+        document.getElementById('time-limit-value').textContent = `${hours} hour${hours > 1 ? 's' : ''}`;
+        updateCustomExamSummary();
     };
-    document.getElementById('difficulty-filter').onchange = function() {
-        appState.customExam.difficulty = this.value;
-        saveState();
-    };
-    document.getElementById('randomize-questions').onchange = function() {
-        appState.customExam.randomize = this.checked;
-        saveState();
-    };
+
     // Section checkboxes
-    document.getElementById('amsthec-include').onchange = function() {
-        updateCustomExamSections();
-    };
-    document.getElementById('hpge-include').onchange = function() {
-        updateCustomExamSections();
-    };
-    document.getElementById('psad-include').onchange = function() {
-        updateCustomExamSections();
-    };
+    document.querySelectorAll('.section-option input[type="checkbox"]').forEach(checkbox => {
+        checkbox.onchange = updateCustomExamSummary;
+    });
+
+    // Preset buttons
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.onclick = function() {
+            const questions = this.dataset.questions;
+            const time = this.dataset.time;
+            
+            document.getElementById('question-count').value = questions;
+            document.getElementById('question-count-value').textContent = questions;
+            document.getElementById('time-limit').value = time;
+            document.getElementById('time-limit-value').textContent = `${time} hour${time > 1 ? 's' : ''}`;
+            
+            updateCustomExamSummary();
+        };
+    });
+
+    // Other controls
+    document.getElementById('difficulty-filter').onchange = updateCustomExamSummary;
+    document.getElementById('randomize-questions').onchange = updateCustomExamSummary;
+
     // Button actions
     document.getElementById('btn-custom-exam-back').onclick = () => showScreen('main-menu');
     document.getElementById('btn-create-custom-exam').onclick = createCustomExam;
+}
+
+function updateCustomExamSummary() {
+    const sections = [];
+    if (document.getElementById('amsthec-include').checked) sections.push('AMSTHEC');
+    if (document.getElementById('hpge-include').checked) sections.push('HPGE');
+    if (document.getElementById('psad-include').checked) sections.push('PSAD');
+    
+    const questionCount = parseInt(document.getElementById('question-count').value);
+    const timeLimit = parseInt(document.getElementById('time-limit').value);
+    const difficulty = document.getElementById('difficulty-filter').value;
+    const randomize = document.getElementById('randomize-questions').checked;
+    
+    let summary = '';
+    
+    if (sections.length === 0) {
+        summary = '<div class="text-red-600">Please select at least one section</div>';
+    } else {
+        summary = `
+            <div class="grid grid-cols-2 gap-2">
+                <div><strong>Sections:</strong></div>
+                <div>${sections.join(', ')}</div>
+                
+                <div><strong>Questions:</strong></div>
+                <div>${questionCount} total</div>
+                
+                <div><strong>Time:</strong></div>
+                <div>${timeLimit} hour${timeLimit > 1 ? 's' : ''}</div>
+                
+                <div><strong>Difficulty:</strong></div>
+                <div>${difficulty === 'all' ? 'All levels' : difficulty}</div>
+                
+                <div><strong>Order:</strong></div>
+                <div>${randomize ? 'Randomized' : 'Sequential'}</div>
+            </div>
+        `;
+    }
+    
+    document.getElementById('exam-summary').innerHTML = summary;
 }
 
 function updateCustomExamSections() {
@@ -561,10 +747,23 @@ function updateCustomExamSections() {
 }
 
 function createCustomExam() {
-    if (appState.customExam.sections.length === 0) {
+    const sections = [];
+    if (document.getElementById('amsthec-include').checked) sections.push('AMSTHEC');
+    if (document.getElementById('hpge-include').checked) sections.push('HPGE');
+    if (document.getElementById('psad-include').checked) sections.push('PSAD');
+    
+    if (sections.length === 0) {
         alert('Please select at least one section for your custom exam.');
         return;
     }
+
+    // Update appState with current settings
+    appState.customExam.sections = sections;
+    appState.customExam.questionCount = parseInt(document.getElementById('question-count').value);
+    appState.customExam.timeLimit = parseInt(document.getElementById('time-limit').value) * 3600;
+    appState.customExam.difficulty = document.getElementById('difficulty-filter').value;
+    appState.customExam.randomize = document.getElementById('randomize-questions').checked;
+
     // Create a combined exam from selected sections
     let allQuestions = [];
     let totalQuestions = 0;
@@ -573,18 +772,24 @@ function createCustomExam() {
         allQuestions = allQuestions.concat(sectionQuestions);
         totalQuestions += sectionQuestions.length;
     });
+    
     // Shuffle and limit to requested count
-    allQuestions = shuffleArray(allQuestions);
+    if (appState.customExam.randomize) {
+        allQuestions = shuffleArray(allQuestions);
+    }
     allQuestions = allQuestions.slice(0, appState.customExam.questionCount);
+    
     // Set up exam state
     appState.currentSection = 'CUSTOM';
     appState.examQuestions = allQuestions;
     appState.timeLeft = appState.customExam.timeLimit;
+    
     // Initialize answer tracking
     appState.answers.CUSTOM = new Array(allQuestions.length).fill(null);
     appState.flaggedQuestions.CUSTOM = new Array(allQuestions.length).fill(false);
     appState.questionNotes.CUSTOM = new Array(allQuestions.length).fill('');
     appState.questionTimes.CUSTOM = new Array(allQuestions.length).fill(0);
+    
     // Start the exam
     saveState();
     showScreen('exam');
@@ -715,7 +920,13 @@ function renderExam() {
         const formattedTime = timeSpent > 0 
             ? `(${Math.floor(timeSpent / 60)}m ${timeSpent % 60}s)` 
             : '';
-        const difficulty = appState.questionDifficulty[appState.currentSection]?.[index] || 'medium';
+        
+        // Convert difficulty number to string for display
+        const difficultyNum = question.difficulty;
+        let difficultyLevel = 'medium';
+        if (difficultyNum === 1) difficultyLevel = 'easy';
+        else if (difficultyNum === 3) difficultyLevel = 'hard';
+        
         const questionCard = document.createElement('div');
         questionCard.className = `question-card ${isFlagged ? 'flagged-question' : ''}`;
         questionCard.id = `question-${index}`;
@@ -725,11 +936,15 @@ function renderExam() {
         questionCard.innerHTML = `
             <div class="question-header">
                 <div>
-                    <p class="question-number">Question ${index + 1}${isFlagged ? '<span class="flagged-indicator"></span>' : ''}
-                        <span class="difficulty-badge difficulty-${difficulty}">${difficulty.charAt(0).toUpperCase()}</span>
+                    <p class="question-number">
+                        Question ${index + 1}
+                        ${isFlagged ? '<span class="flagged-indicator"></span>' : ''}
+                        <span class="difficulty-badge difficulty-${difficultyLevel}">
+                            ${difficultyLevel.charAt(0).toUpperCase()}
+                        </span>
                     </p>
                     <p class="time-spent">${formattedTime}</p>
-                    ${question.group_id && question.stem.trim().startsWith('Situation') ? `<p class="question-group">Situation: ${question.group_id}</p>` : (question.group_id ? `<p class="question-group">Problem from Situation ${question.group_id}</p>` : '')}
+                    ${question.group_id ? `<p class="question-group">Situation: ${question.group_id}</p>` : ''}
                 </div>
             </div>
             <p class="question-stem whitespace-pre-wrap">${question.stem}</p>
@@ -873,13 +1088,7 @@ function renderExam() {
             `;
         }
     };
-    document.getElementById('btn-submit-exam').onclick = () => {
-        showConfirmModal(
-            "Confirm Submission",
-            "Are you sure you want to submit this exam section? You won't be able to change your answers after submission.",
-            submitExam
-        );
-    };
+    document.getElementById('btn-submit-exam').onclick = showSubmitConfirmation;
     document.getElementById('btn-jump-to-first').onclick = jumpToFirstUnanswered;
     document.getElementById('btn-nav-next').onclick = () => {
         navigateStep(1);
@@ -926,11 +1135,7 @@ function navigateStep(direction) {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     } else if (nextIndex >= appState.examQuestions.length) {
-        showConfirmModal(
-            "Section Completed",
-            "You have reached the end of the section. Do you want to submit your exam now?",
-            submitExam
-        );
+        showSubmitConfirmation();
     }
 }
 
@@ -953,8 +1158,147 @@ function jumpToFirstUnanswered() {
 }
 
 // ======================
-// SUBMIT EXAM
+// SUBMIT EXAM - DOUBLE CONFIRMATION
 // ======================
+function showSubmitConfirmation() {
+    const sectionName = appState.currentSection;
+    const answers = appState.answers[sectionName];
+    const totalQuestions = appState.examQuestions.length;
+    
+    // Count unanswered questions
+    const unansweredCount = answers.filter(answer => answer === null).length;
+    const answeredCount = totalQuestions - unansweredCount;
+    
+    // First confirmation - show unanswered questions warning
+    const firstModal = document.createElement('div');
+    firstModal.className = 'modal-overlay';
+    firstModal.innerHTML = `
+        <div class="modal-content confirm-modal" style="max-width: 500px;">
+            <h2>📋 Submission Review</h2>
+            
+            <div class="submission-stats mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 rounded">
+                <div class="text-center mb-3">
+                    <div class="text-2xl font-bold text-yellow-600">${unansweredCount} Unanswered</div>
+                    <div class="text-sm text-gray-600">out of ${totalQuestions} total questions</div>
+                </div>
+                
+                <div class="progress-bar-container mb-2">
+                    <div class="progress-bar-fill" style="width: ${(answeredCount/totalQuestions)*100}%"></div>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span>Answered: ${answeredCount}</span>
+                    <span>Unanswered: ${unansweredCount}</span>
+                </div>
+            </div>
+
+            ${unansweredCount > 0 ? `
+                <div class="unanswered-warning mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded">
+                    <div class="flex items-center gap-2 text-red-600 dark:text-red-400 mb-2">
+                        <span>⚠️</span>
+                        <strong>You have unanswered questions!</strong>
+                    </div>
+                    <p class="text-sm">You haven't answered ${unansweredCount} question(s). These will be marked as wrong.</p>
+                </div>
+            ` : `
+                <div class="completed-warning mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 rounded">
+                    <div class="flex items-center gap-2 text-green-600 dark:text-green-400">
+                        <span>✅</span>
+                        <strong>All questions answered!</strong>
+                    </div>
+                </div>
+            `}
+
+            <p class="mb-4 text-gray-600 dark:text-gray-400">
+                Are you sure you want to proceed with submission? You cannot change answers after submitting.
+            </p>
+
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-secondary" id="btn-review-first">Review Questions</button>
+                <button type="button" class="btn btn-primary" id="btn-confirm-submit">Proceed to Final Confirmation</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(firstModal);
+
+    // Review questions button - jump to first unanswered
+    firstModal.querySelector('#btn-review-first').addEventListener('click', () => {
+        document.body.removeChild(firstModal);
+        jumpToFirstUnanswered();
+    });
+
+    // Proceed to final confirmation
+    firstModal.querySelector('#btn-confirm-submit').addEventListener('click', () => {
+        document.body.removeChild(firstModal);
+        showFinalConfirmation(unansweredCount, totalQuestions);
+    });
+
+    // Close on overlay click
+    firstModal.addEventListener('click', (e) => {
+        if (e.target === firstModal) {
+            document.body.removeChild(firstModal);
+        }
+    });
+}
+
+// Final confirmation modal
+function showFinalConfirmation(unansweredCount, totalQuestions) {
+    const finalModal = document.createElement('div');
+    finalModal.className = 'modal-overlay';
+    finalModal.innerHTML = `
+        <div class="modal-content confirm-modal" style="max-width: 450px;">
+            <div class="text-center mb-4">
+                <div class="text-3xl mb-2">🚨</div>
+                <h2>Final Confirmation</h2>
+            </div>
+
+            <div class="final-warning mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded text-center">
+                <div class="text-red-600 dark:text-red-400 font-bold text-lg mb-2">
+                    This is your last chance to review!
+                </div>
+                <p class="text-sm">
+                    ${unansweredCount > 0 
+                        ? `${unansweredCount} unanswered question(s) will be marked as wrong.` 
+                        : 'All questions have been answered.'}
+                </p>
+            </div>
+
+            <p class="text-center mb-4 text-gray-600 dark:text-gray-400">
+                Once submitted, you cannot change your answers. Your exam will be graded immediately.
+            </p>
+
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-secondary" id="btn-go-back">Go Back</button>
+                <button type="button" class="btn btn-danger" id="btn-final-submit">
+                    🎯 Yes, Submit My Exam
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(finalModal);
+
+    // Go back button - returns to first confirmation
+    finalModal.querySelector('#btn-go-back').addEventListener('click', () => {
+        document.body.removeChild(finalModal);
+        showSubmitConfirmation();
+    });
+
+    // Final submit button
+    finalModal.querySelector('#btn-final-submit').addEventListener('click', () => {
+        document.body.removeChild(finalModal);
+        submitExam();
+    });
+
+    // Close on overlay click
+    finalModal.addEventListener('click', (e) => {
+        if (e.target === finalModal) {
+            document.body.removeChild(finalModal);
+            showSubmitConfirmation(); // Go back to first confirmation
+        }
+    });
+}
+
 function submitExam() {
     clearInterval(appState.timerInterval);
     const sectionName = appState.currentSection;
@@ -996,7 +1340,7 @@ function submitExam() {
                 time_spent: appState.questionTimes[sectionName][index],
                 flagged: appState.flaggedQuestions[sectionName][index],
                 notes: appState.questionNotes[sectionName][index],
-                difficulty: appState.questionDifficulty[sectionName][index],
+                difficulty: question.difficulty,
                 topic: question.topic
             });
         }
@@ -1186,12 +1530,20 @@ function renderResultsScreen() {
                     <p class="correct-answer">Correct Answer: ${wrong.correct_answer}</p>
                     ${wrong.explanation ? `<div class="explanation"><p class="explanation-title">Explanation:</p><p class="whitespace-pre-wrap">${wrong.explanation}</p></div>` : ''}
                 </div>
-                <div class="question-meta mt-2">
-                    <p>Time spent: ${Math.floor(wrong.time_spent / 60)}m ${wrong.time_spent % 60}s</p>
-                    <p>Difficulty: <span class="difficulty-badge difficulty-${wrong.difficulty}">${wrong.difficulty}</span></p>
-                    ${wrong.notes ? `<p>Note: ${wrong.notes}</p>` : ''}
-                    <button type="button" class="btn btn-primary btn-sm mt-2 view-solution">View Solution</button>
+                <div class="question-meta mt-4 flex justify-between items-center">
+                    <div class="meta-info text-sm text-gray-600">
+                        <div>Time spent: ${Math.floor(wrong.time_spent / 60)}m ${wrong.time_spent % 60}s</div>
+                        <div>Difficulty: <span class="difficulty-badge difficulty-${wrong.difficulty}">${wrong.difficulty}</span></div>
+                    </div>
+                    <button type="button" class="btn btn-primary view-solution">
+                        📖 View Solution
+                    </button>
                 </div>
+                ${wrong.notes ? `
+                    <div class="note-container mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                        <strong>Your Note:</strong> ${wrong.notes}
+                    </div>
+                ` : ''}
             `;
             // Add solution button functionality
             wrongCard.querySelector('.view-solution').addEventListener('click', () => {
@@ -1212,133 +1564,231 @@ function renderResultsScreen() {
 }
 
 // ======================
-// SOLUTION TEMPLATE
+// SOLUTION SYSTEM - IMAGE BASED
 // ======================
 function showSolution(wrongQuestion) {
-    // Create solution modal
     const solutionModal = document.createElement('div');
     solutionModal.className = 'modal-overlay';
-    solutionModal.style.zIndex = 60;
     solutionModal.innerHTML = `
-        <div class="modal-content" style="max-width: 80%; max-height: 80vh; overflow-y: auto; position: relative;">
-            <h2 class="section-title">Question ${wrongQuestion.number}</h2>
-            <div class="question-stem mb-4">${wrongQuestion.stem}</div>
-            <div class="solution-header mb-4">
-                <h3>Solution</h3>
-                <button type="button" class="btn btn-primary close-solution">Close</button>
+        <div class="modal-content" style="max-width: 95%; max-height: 95vh; width: auto;">
+            <div class="flex justify-between items-center mb-4 sticky top-0 bg-white dark:bg-gray-800 p-4 border-b">
+                <h2 class="section-title">Solution - Question ${wrongQuestion.number}</h2>
+                <button type="button" class="btn btn-secondary close-solution">Close</button>
             </div>
-            <div class="solution-content">
-                <div class="solution-steps">
-                    <h4>Step 1: Understanding the Problem</h4>
-                    <p>${wrongQuestion.solution?.step1 || 'This is where the explanation would begin, breaking down how to approach the question.'}</p>
-                    <h4>Step 2: Key Formulas</h4>
-                    <p>${wrongQuestion.solution?.step2 || 'Relevant formulas would be listed here with explanations of each variable.'}</p>
-                    <h4>Step 3: Calculation</h4>
-                    <p>${wrongQuestion.solution?.step3 || 'Detailed calculation process showing how to arrive at the answer.'}</p>
-                    <h4>Step 4: Final Answer</h4>
-                    <p>${wrongQuestion.solution?.step4 || 'Explanation of why the answer is correct and common pitfalls to avoid.'}</p>
-                </div>
-                <div class="solution-note mt-4">
-                    <h4>Pro Tip:</h4>
-                    <p>${wrongQuestion.solution?.proTip || 'This is where additional tips and insights would be provided to help you understand the concept better.'}</p>
-                </div>
-                <div class="solution-footer mt-4">
-                    <div class="solution-rating">
-                        <span>Difficulty:</span>
-                        <span class="difficulty-badge difficulty-${wrongQuestion.difficulty}">${wrongQuestion.difficulty.charAt(0).toUpperCase()}</span>
+            
+            <div class="solution-content p-4" style="overflow-y: auto; max-height: calc(95vh - 100px);">
+                <!-- Question Preview -->
+                <div class="question-preview p-4 bg-gray-50 dark:bg-gray-800 rounded-lg mb-4">
+                    <h3 class="font-bold mb-2">Question:</h3>
+                    <p class="question-stem mb-2">${wrongQuestion.stem}</p>
+                    <div class="answer-comparison flex gap-4 text-sm">
+                        <span class="user-answer text-red-600 dark:text-red-400">
+                            <strong>Your Answer:</strong> ${wrongQuestion.user_answer || "Not Answered"}
+                        </span>
+                        <span class="correct-answer text-green-600 dark:text-green-400">
+                            <strong>Correct Answer:</strong> ${wrongQuestion.correct_answer}
+                        </span>
                     </div>
-                    <div class="solution-topic">
-                        <span>Topic:</span>
-                        <span class="topic-badge">${wrongQuestion.topic || 'General'}</span>
+                </div>
+
+                <!-- Solution Image -->
+                <div class="solution-image text-center">
+                    <h3 class="font-bold mb-4 text-lg">Step-by-Step Solution</h3>
+                    <div class="bg-white p-4 rounded-lg border">
+                        <img src="${getSolutionImageUrl(wrongQuestion)}" 
+                             alt="Solution for question ${wrongQuestion.number}" 
+                             class="max-w-full h-auto mx-auto"
+                             style="max-height: 70vh; object-fit: contain;">
+                        <p class="text-sm text-gray-500 mt-2">Scroll to view complete solution</p>
                     </div>
+                </div>
+
+                <!-- Navigation for multiple solution pages -->
+                <div class="solution-navigation flex justify-between items-center mt-4 pt-4 border-t">
+                    <button type="button" class="btn btn-secondary btn-sm prev-solution" disabled>
+                        ← Previous Page
+                    </button>
+                    <span class="text-sm text-gray-500">Page 1 of 1</span>
+                    <button type="button" class="btn btn-secondary btn-sm next-solution" disabled>
+                        Next Page →
+                    </button>
                 </div>
             </div>
         </div>
     `;
-    // Add to document
+
     document.body.appendChild(solutionModal);
-    // Close button
+    
+    // Close functionality
     solutionModal.querySelector('.close-solution').addEventListener('click', () => {
         document.body.removeChild(solutionModal);
     });
-    // Auto-scroll to top
-    window.scrollTo(0, 0);
+    
+    // Close on overlay click
+    solutionModal.addEventListener('click', (e) => {
+        if (e.target === solutionModal) {
+            document.body.removeChild(solutionModal);
+        }
+    });
+}
+
+// Function to get solution image URL based on question
+function getSolutionImageUrl(question) {
+    // You can customize this based on your image naming convention
+    // Example: solutions/AMSTHEC-001.jpg, solutions/HPGE-045.png, etc.
+    const questionId = question.id || `Q${question.number.toString().padStart(3, '0')}`;
+    return `solutions/${questionId}.jpg`; // or .png based on your files
 }
 
 function renderPerformanceHeatmap(result) {
-    const ctx = document.getElementById('performance-heatmap').getContext('2d');
-    const section = result.section || 'CUSTOM';
-    const topics = section === 'CUSTOM' 
-        ? Object.keys(result.topicPerformance).slice(0, 20) 
-        : SECTIONS[section]?.topics || Object.keys(result.topicPerformance);
-    // Calculate performance data
-    const data = topics.map(topic => {
-        const perf = result.topicPerformance[topic];
-        if (perf && perf.total > 0) {
-            return (perf.correct / perf.total) * 100;
-        }
-        return 0;
-    });
-    // Create heatmap visualization
     const canvas = document.getElementById('performance-heatmap');
-    const width = canvas.width;
-    const height = canvas.height;
-    const cellWidth = width / Math.min(20, topics.length);
-    const cellHeight = height;
-    ctx.clearRect(0, 0, width, height);
-    // Draw heatmap cells
-    data.forEach((percentage, index) => {
+    const ctx = canvas.getContext('2d');
+    const topicPerformance = result.topicPerformance || {};
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    const topics = Object.keys(topicPerformance).filter(topic => topicPerformance[topic].total > 0);
+    if (topics.length === 0) return;
+    
+    const cellWidth = canvas.width / Math.min(8, topics.length); // Max 8 topics per row
+    const cellHeight = 30;
+    const rows = Math.ceil(topics.length / 8);
+    
+    topics.forEach((topic, index) => {
+        const perf = topicPerformance[topic];
+        const accuracy = (perf.correct / perf.total) * 100;
+        const row = Math.floor(index / 8);
+        const col = index % 8;
+        
+        // Determine color based on accuracy
         let color;
-        if (percentage < 50) {
-            color = 'rgba(220, 38, 38, 0.7)'; // Red
-        } else if (percentage < 75) {
-            color = 'rgba(245, 158, 11, 0.7)'; // Yellow
-        } else {
-            color = 'rgba(16, 185, 129, 0.7)'; // Green
-        }
+        if (accuracy >= 80) color = '#10b981';      // Green
+        else if (accuracy >= 60) color = '#f59e0b'; // Yellow
+        else color = '#dc2626';                     // Red
+        
+        // Draw cell
         ctx.fillStyle = color;
-        ctx.fillRect(index * cellWidth, 0, cellWidth - 2, cellHeight);
-        // Add labels
-        if (index < topics.length) {
-            ctx.fillStyle = '#000';
-            ctx.font = '10px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(topics[index], index * cellWidth + cellWidth/2, height - 10);
-        }
+        ctx.fillRect(col * cellWidth, row * cellHeight, cellWidth - 2, cellHeight - 2);
+        
+        // Draw text
+        ctx.fillStyle = '#000';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+            `${topic.substring(0, 12)}`, 
+            col * cellWidth + cellWidth/2, 
+            row * cellHeight + cellHeight/2 + 3
+        );
+        
+        // Draw accuracy percentage
+        ctx.font = '8px Arial';
+        ctx.fillText(
+            `${Math.round(accuracy)}%`, 
+            col * cellWidth + cellWidth/2, 
+            row * cellHeight + cellHeight/2 + 15
+        );
+    });
+    
+    // Add legend
+    ctx.fillStyle = '#000';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('Legend: ', 10, rows * cellHeight + 20);
+    
+    const legends = [
+        { color: '#10b981', text: '≥80% (Strong)' },
+        { color: '#f59e0b', text: '60-79% (Good)' },
+        { color: '#dc2626', text: '<60% (Needs Review)' }
+    ];
+    
+    legends.forEach((legend, index) => {
+        ctx.fillStyle = legend.color;
+        ctx.fillRect(60 + index * 80, rows * cellHeight + 15, 10, 10);
+        ctx.fillStyle = '#000';
+        ctx.fillText(legend.text, 75 + index * 80, rows * cellHeight + 23);
     });
 }
 
 function renderStudyFocusRecommendations(result) {
     const container = document.getElementById('study-focus-container');
-    container.innerHTML = '';
-    // Get topic performance data
     const topicPerformance = result.topicPerformance || {};
-    const topics = Object.keys(topicPerformance)
-        .filter(topic => topicPerformance[topic].total > 0)
+    
+    // Calculate weakest topics (accuracy < 70%)
+    const weakTopics = Object.keys(topicPerformance)
+        .filter(topic => {
+            const perf = topicPerformance[topic];
+            const accuracy = (perf.correct / perf.total) * 100;
+            return accuracy < 70 && perf.total >= 3; // Only include topics with sufficient questions
+        })
         .sort((a, b) => {
-            const perfA = topicPerformance[a];
-            const perfB = topicPerformance[b];
-            return (perfA.correct / perfA.total) - (perfB.correct / perfB.total);
-        });
-    // Generate recommendations for weakest topics
-    const recommendations = topics.slice(0, 3).map((topic, index) => {
+            const accA = (topicPerformance[a].correct / topicPerformance[a].total) * 100;
+            const accB = (topicPerformance[b].correct / topicPerformance[b].total) * 100;
+            return accA - accB;
+        })
+        .slice(0, 3); // Top 3 weakest topics
+
+    if (weakTopics.length === 0) {
+        container.innerHTML = `
+            <div class="study-focus-item bg-green-50 dark:bg-green-900/20 border border-green-200 rounded-lg p-4">
+                <strong>Excellent Performance! 🎉</strong>
+                <p class="mt-2">You're performing well across all topics. Consider challenging yourself with:</p>
+                <ul class="ml-4 mt-1 list-disc">
+                    <li>Advanced difficulty questions</li>
+                    <li>Time-attack mode for speed</li>
+                    <li>Teaching concepts to reinforce learning</li>
+                </ul>
+            </div>
+        `;
+        return;
+    }
+
+    const recommendations = weakTopics.map((topic, index) => {
         const perf = topicPerformance[topic];
         const accuracy = Math.round((perf.correct / perf.total) * 100);
+        const priorityColors = [
+            'bg-red-50 border-red-200 dark:bg-red-900/20',
+            'bg-orange-50 border-orange-200 dark:bg-orange-900/20', 
+            'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20'
+        ];
+        
+        const studyStrategies = [
+            "Review fundamental concepts and formulas",
+            "Practice with step-by-step solutions", 
+            "Focus on understanding common mistakes",
+            "Create summary notes for key points",
+            "Try similar questions with variations"
+        ];
+
         return `
-            <div class="study-focus-item">
-                <strong>${topic}</strong>
-                <div>Accuracy: ${accuracy}% (${perf.correct}/${perf.total})</div>
-                <div class="mt-2">Recommended Action: 
-                    <ul class="ml-4 mt-1" style="list-style-type: disc;">
-                        <li>Review foundational concepts for ${topic}</li>
-                        <li>Practice ${topic} questions for 30 minutes</li>
-                        <li>Focus on ${topic} for your next study session</li>
+            <div class="study-focus-item ${priorityColors[index]} border rounded-lg p-4 mb-3">
+                <div class="flex justify-between items-start mb-2">
+                    <strong class="text-lg">${index + 1}. ${topic}</strong>
+                    <span class="accuracy-badge ${accuracy < 50 ? 'bg-red-500' : accuracy < 70 ? 'bg-orange-500' : 'bg-yellow-500'} text-white px-2 py-1 rounded text-sm">
+                        ${accuracy}% Accuracy
+                    </span>
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    ${perf.correct}/${perf.total} questions correct
+                </div>
+                <div class="recommended-actions">
+                    <strong>Recommended Study Plan:</strong>
+                    <ul class="ml-4 mt-1 space-y-1">
+                        ${studyStrategies.slice(0, 3).map(strategy => 
+                            `<li class="flex items-center gap-2">
+                                <span class="w-2 h-2 bg-primary rounded-full"></span>
+                                ${strategy}
+                            </li>`
+                        ).join('')}
                     </ul>
+                </div>
+                <div class="estimated-time mt-3 text-sm text-gray-500">
+                    ⏱️ Estimated study time: ${Math.max(30, Math.round((100 - accuracy) * 0.8))} minutes
                 </div>
             </div>
         `;
     });
-    // Add recommendations
+
     container.innerHTML = recommendations.join('');
 }
 
@@ -1398,7 +1848,13 @@ function renderReviewQuestions() {
         const flagged = appState.flaggedQuestions[sectionName]?.[index] || false;
         const notes = appState.questionNotes[sectionName]?.[index] || '';
         const timeSpent = appState.questionTimes[sectionName]?.[index] || 0;
-        const difficultyLevel = appState.questionDifficulty[sectionName]?.[index] || 'medium';
+        
+        // Convert difficulty number to string for display
+        const difficultyNum = question.difficulty;
+        let difficultyLevel = 'medium';
+        if (difficultyNum === 1) difficultyLevel = 'easy';
+        else if (difficultyNum === 3) difficultyLevel = 'hard';
+        
         // Apply filters
         if (filter === 'correct' && !isCorrect) return;
         if (filter === 'wrong' && (isCorrect || !isAnswered)) return;
@@ -1461,7 +1917,29 @@ function renderReviewQuestions() {
                 </div>
                 <p>${notes}</p>
             </div>` : ''}
+            <div class="mt-4">
+                <button type="button" class="btn btn-primary view-solution" data-question="${index}">
+                    📖 View Solution
+                </button>
+            </div>
         `;
+        
+        // Add solution button functionality
+        reviewCard.querySelector('.view-solution').addEventListener('click', () => {
+            const wrongQuestion = {
+                number: index + 1,
+                stem: question.stem,
+                user_answer: userAnswer,
+                correct_answer: question.correct_answer,
+                figure: question.figure,
+                group_id: question.group_id,
+                difficulty: difficultyLevel,
+                topic: question.topic,
+                id: question.id
+            };
+            showSolution(wrongQuestion);
+        });
+        
         container.appendChild(reviewCard);
     });
     // Add image zoom functionality
@@ -1683,87 +2161,144 @@ function renderSettingsScreen() {
 }
 
 // ======================
-// PDF GENERATION
+// PDF GENERATION - SINGLE PAGE WITH ANSWER KEY
 // ======================
 function generateOfflinePDF() {
-    // Create a visual PDF container
     const pdfContainer = document.getElementById('pdf-container');
-    pdfContainer.innerHTML = '';
-    // Add header
-    const header = document.createElement('div');
-    header.className = 'printable-header';
-    header.innerHTML = `
-        <h2 class="printable-title">Civil Engineering Exam Simulator</h2>
-        <p class="printable-subtitle">Printable version for offline study</p>
-        <p class="text-muted">This document contains all exam questions with figures and explanations for offline study</p>
-    `;
-    pdfContainer.appendChild(header);
-    // Add sections
-    Object.values(SECTIONS).forEach((section, sectionIndex) => {
-        const sectionContainer = document.createElement('div');
-        sectionContainer.className = 'printable-section';
-        sectionContainer.innerHTML = `<h3 class="printable-title">Section ${sectionIndex + 1}: ${section.title}</h3>`;
-        const questions = getQuestionsForSection(section.name);
-        questions.forEach((question, index) => {
-            const questionContainer = document.createElement('div');
-            questionContainer.className = 'printable-question';
-            questionContainer.innerHTML = `
-                <h3>Question ${index + 1}</h3>
-                <div class="printable-stem">${question.stem}</div>
-            `;
-            // Add figure if exists
-            if (question.figure) {
-                const figureContainer = document.createElement('div');
-                figureContainer.className = 'printable-figure';
-                figureContainer.innerHTML = `
-                    <img src="${question.figure}" alt="Figure for question ${index + 1}">
-                    <p>Figure ${index + 1}: ${question.figure_caption || ''}</p>
-                `;
-                questionContainer.appendChild(figureContainer);
-            }
-            // Add choices
-            const choicesContainer = document.createElement('div');
-            choicesContainer.className = 'printable-choices';
-            choicesContainer.innerHTML = '<p>Choices:</p>';
-            question.choices.forEach((choice, choiceIndex) => {
-                const letter = String.fromCharCode(65 + choiceIndex);
-                const choiceDiv = document.createElement('div');
-                choiceDiv.className = 'printable-choice';
-                choiceDiv.innerHTML = `<span class="choice-letter">${letter}.</span> ${choice.trim()}`;
-                choicesContainer.appendChild(choiceDiv);
-            });
-            questionContainer.appendChild(choicesContainer);
-            // Add explanation if exists
-            if (question.explanation) {
-                const explanationContainer = document.createElement('div');
-                explanationContainer.className = 'printable-explanation';
-                explanationContainer.innerHTML = `
-                    <h4>Explanation:</h4>
-                    <p>${question.explanation}</p>
-                `;
-                questionContainer.appendChild(explanationContainer);
-            }
-            sectionContainer.appendChild(questionContainer);
-        });
-        pdfContainer.appendChild(sectionContainer);
+    
+    // Get all questions from all sections
+    let allQuestions = [];
+    Object.keys(SECTIONS).forEach(sectionName => {
+        const sectionQuestions = getQuestionsForSection(sectionName);
+        allQuestions = allQuestions.concat(sectionQuestions.map(q => ({...q, section: sectionName})));
     });
-    // Add footer
-    const footer = document.createElement('div');
-    footer.className = 'printable-footer';
-    footer.innerHTML = `
-        <p>© ${new Date().getFullYear()} Civil Engineering Exam Simulator. All rights reserved.</p>
-        <p>Generated on: ${new Date().toLocaleString()}</p>
-        <p class="text-muted">This document is for personal study purposes only. Do not distribute.</p>
+
+    // Create answer key
+    const answerKey = allQuestions.map((q, index) => {
+        return {
+            number: index + 1,
+            correctAnswer: q.correct_answer,
+            section: q.section
+        };
+    });
+
+    pdfContainer.innerHTML = `
+        <div class="printable-container">
+            <!-- Header -->
+            <div class="printable-header">
+                <h1 class="printable-title">Civil Engineering Exam Study Guide</h1>
+                <p class="printable-subtitle">Complete Question Bank with Answer Key</p>
+                <p class="text-center text-gray-600 mt-2">Generated on ${new Date().toLocaleDateString()}</p>
+            </div>
+
+            <!-- Questions Section -->
+            <div class="printable-section">
+                ${allQuestions.map((question, index) => `
+                    <div class="printable-question" style="page-break-inside: avoid; margin-bottom: 2rem;">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 style="font-size: 14pt; font-weight: bold; margin: 0;">
+                                Question ${index + 1} 
+                                <span style="font-size: 10pt; color: #666; margin-left: 10px;">
+                                    [${question.section} - ${question.difficulty}]
+                                </span>
+                            </h3>
+                            <div style="width: 100px; height: 20px; border-bottom: 1px solid #ccc;"></div>
+                        </div>
+                        
+                        <div class="printable-stem" style="margin: 1rem 0; font-size: 12pt; line-height: 1.4;">
+                            ${question.stem}
+                        </div>
+
+                        ${question.figure ? `
+                            <div class="printable-figure" style="text-align: center; margin: 1.5rem 0;">
+                                <img src="${question.figure}" alt="Figure for question ${index + 1}" 
+                                     style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px;">
+                                ${question.figure_caption ? `
+                                    <p style="font-size: 10pt; color: #666; margin-top: 0.5rem;">${question.figure_caption}</p>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+
+                        <div class="printable-choices" style="margin-top: 1.5rem;">
+                            ${question.choices.map((choice, choiceIndex) => {
+                                const letter = String.fromCharCode(65 + choiceIndex);
+                                return `
+                                    <div class="printable-choice" style="padding: 0.5rem; margin: 0.25rem 0; border: 1px solid #e5e7eb; border-radius: 4px; background: #f9fafb;">
+                                        <span style="font-weight: bold; margin-right: 0.5rem;">${letter}.</span>
+                                        ${choice.trim()}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+
+                        <!-- Space for working -->
+                        <div style="margin-top: 1.5rem; padding: 1rem; border: 1px dashed #ccc; border-radius: 4px; min-height: 100px;">
+                            <div style="font-size: 10pt; color: #999; margin-bottom: 0.5rem;">Your solution:</div>
+                            <!-- Blank space for working -->
+                        </div>
+                    </div>
+
+                    ${(index + 1) % 3 === 0 ? '<div style="page-break-after: always;"></div>' : ''}
+                `).join('')}
+            </div>
+
+            <!-- Page break before answer key -->
+            <div style="page-break-before: always;"></div>
+
+            <!-- Answer Key Section -->
+            <div class="printable-section">
+                <div class="printable-header">
+                    <h2 class="printable-title">Answer Key</h2>
+                    <p class="printable-subtitle">Correct answers for all questions</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 2rem;">
+                    ${answerKey.map(item => `
+                        <div style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px; text-align: center;">
+                            <div style="font-weight: bold;">Q${item.number}</div>
+                            <div style="font-size: 1.2em; color: #10b981; font-weight: bold;">${item.correct_answer}</div>
+                            <div style="font-size: 0.8em; color: #666;">${item.section}</div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- Summary by Section -->
+                <div style="margin-top: 3rem; padding: 1.5rem; border: 1px solid #e5e7eb; border-radius: 8px;">
+                    <h3 style="font-size: 14pt; font-weight: bold; margin-bottom: 1rem;">Summary by Section</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                        ${Object.keys(SECTIONS).map(sectionName => {
+                            const sectionQuestions = answerKey.filter(q => q.section === sectionName);
+                            return `
+                                <div style="text-align: center; padding: 1rem; background: #f8fafc; border-radius: 4px;">
+                                    <div style="font-weight: bold;">${sectionName}</div>
+                                    <div style="font-size: 1.1em; color: #3b82f6;">${sectionQuestions.length} questions</div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="printable-footer">
+                <p>© ${new Date().getFullYear()} Civil Engineering Exam Simulator</p>
+                <p>For educational purposes only. Do not distribute.</p>
+                <p style="font-size: 0.8em; color: #999;">Page 1 of 1 - Complete set</p>
+            </div>
+        </div>
     `;
-    pdfContainer.appendChild(footer);
+
     // Show the PDF container for print preview
     pdfContainer.style.display = 'block';
-    // Use the browser's native print dialog
-    window.print();
-    // Hide the container again after printing
+    
+    // Wait a moment for images to load, then print
     setTimeout(() => {
-        pdfContainer.style.display = 'none';
-    }, 1000);
+        window.print();
+        // Hide the container after printing
+        setTimeout(() => {
+            pdfContainer.style.display = 'none';
+        }, 1000);
+    }, 500);
 }
 
 // ======================
@@ -1785,13 +2320,6 @@ function getFallbackQuestions() {
             section: "AMSTHEC",
             topic: "Trigonometry",
             difficulty: "medium",
-            solution: {
-                step1: "Identify the triangle formed by the surveyor, the top of the building, and the base of the building.",
-                step2: "Use the tangent function: tan(θ) = opposite/adjacent",
-                step3: "tan(30°) = height / 50, so height = 50 * tan(30°)",
-                step4: "Calculate: 50 * (1/√3) = 28.87 meters",
-                proTip: "Remember that tan(30°) = 1/√3 ≈ 0.577"
-            },
             stem: "A surveyor wants to measure the height of a building using a theodolite. If the angle of elevation to the top of the building is 30° and the distance from the theodolite to the building is 50 meters, what is the height of the building?",
             choices: [
                 "25 meters",
@@ -1807,13 +2335,6 @@ function getFallbackQuestions() {
             section: "AMSTHEC",
             topic: "Calculus",
             difficulty: "hard",
-            solution: {
-                step1: "Identify the function as a polynomial: f(x) = 3x² + 5x - 2",
-                step2: "Apply the power rule: d/dx(x^n) = nx^(n-1)",
-                step3: "Differentiate each term: d/dx(3x²) = 6x, d/dx(5x) = 5, d/dx(-2) = 0",
-                step4: "Combine results: f'(x) = 6x + 5",
-                proTip: "Remember that the derivative of a constant is always 0"
-            },
             stem: "What is the derivative of f(x) = 3x² + 5x - 2?",
             choices: [
                 "6x + 5",
@@ -1829,13 +2350,6 @@ function getFallbackQuestions() {
             section: "HPGE",
             topic: "Soil Mechanics",
             difficulty: "medium",
-            solution: {
-                step1: "Understand the relationship between void ratio (e) and porosity (n)",
-                step2: "Use the formula: n = e / (1 + e)",
-                step3: "Substitute e = 0.6 into the formula",
-                step4: "Calculate: n = 0.6 / (1 + 0.6) = 0.6 / 1.6 = 0.375",
-                proTip: "Remember that porosity is always less than the void ratio"
-            },
             stem: "In a soil sample, the void ratio is 0.6 and the specific gravity of soil solids is 2.7. What is the porosity of the soil?",
             choices: [
                 "0.375",
@@ -1851,13 +2365,6 @@ function getFallbackQuestions() {
             section: "PSAD",
             topic: "Concrete Design",
             difficulty: "hard",
-            solution: {
-                step1: "Review building code requirements for minimum reinforcement",
-                step2: "Understand that minimum reinforcement is needed to ensure ductile behavior",
-                step3: "Recall the standard minimum reinforcement ratio for simply supported beams",
-                step4: "The minimum reinforcement ratio is typically 0.003 (0.3%)",
-                proTip: "This minimum ensures the beam fails in tension rather than brittle compression"
-            },
             stem: "What is the minimum reinforcement ratio for a simply supported reinforced concrete beam?",
             choices: [
                 "0.001",
@@ -1915,4 +2422,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         form.addEventListener('submit', e => e.preventDefault());
     });
 });
-
