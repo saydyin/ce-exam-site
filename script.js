@@ -151,6 +151,14 @@ async function loadQuestionBank() {
         });
         
         appState.fullQuestionBank = questionBank;
+        
+        // Log question counts for debugging
+        console.log("=== QUESTION BANK STATISTICS ===");
+        Object.keys(SECTIONS).forEach(sectionName => {
+            const sectionQuestions = appState.fullQuestionBank.filter(q => q.section === sectionName);
+            console.log(`${sectionName}: ${sectionQuestions.length} questions available`);
+        });
+        
         return questionBank;
     } catch (error) {
         console.error('Error loading question bank:', error);
@@ -164,144 +172,71 @@ function getQuestionsForSection(sectionName) {
         console.warn('Question bank not loaded, using fallback questions');
         return getSampleQuestions(sectionName);
     }
+    
     // Get questions for this section
     let sectionQuestions = appState.fullQuestionBank.filter(q => q.section === sectionName);
+    
     // Apply difficulty filter if in custom exam mode
     if (appState.view === 'custom-exam' && appState.customExam.difficulty !== 'all') {
         sectionQuestions = sectionQuestions.filter(q => q.difficulty === appState.customExam.difficulty);
     }
-    // Process questions with groups
+    
+    // Process questions with groups (simplified version that doesn't reduce counts)
     const processedQuestions = processQuestionsWithGroups(sectionQuestions);
-    // Apply custom exam question count if applicable
+    
+    // Apply custom exam question count if applicable, otherwise use section requirement
     const requiredTotal = (appState.view === 'custom-exam') 
         ? Math.min(processedQuestions.length, appState.customExam.questionCount) 
         : SECTION_REQUIREMENTS[sectionName].total;
-    return processedQuestions.slice(0, requiredTotal);
+    
+    // Ensure we don't exceed available questions
+    const finalQuestions = processedQuestions.slice(0, requiredTotal);
+    
+    console.log(`${sectionName}: Using ${finalQuestions.length} questions (requested: ${requiredTotal}, available: ${sectionQuestions.length})`);
+    
+    return finalQuestions;
 }
 
+// Simplified grouping function that doesn't reduce question counts
 function processQuestionsWithGroups(questions) {
-    // STEP 1: Group questions by group_id
+    // Simple grouping that maintains situation questions together without reducing counts
     const groups = {};
+    
+    // Group questions by group_id
     questions.forEach((question, index) => {
         const groupId = question.group_id || `standalone_${index}`;
         if (!groups[groupId]) {
-            groups[groupId] = {
-                questions: [],
-                startIndex: index,
-                isSituation: false
-            };
+            groups[groupId] = [];
         }
-        groups[groupId].questions.push({...question, originalIndex: index});
+        groups[groupId].push({...question, originalIndex: index});
     });
 
-    // STEP 2: Identify true situation groups
+    // Format situation groups (questions starting with "Situation" or in groups of 3+)
     Object.values(groups).forEach(group => {
-        // Check if explicitly marked as situation
-        if (group.questions.some(q => q.stem?.trim().startsWith('Situation'))) {
-            group.isSituation = true;
-            return;
-        }
-        
-        // Check if it's a sequential group with same group_id (3+ questions)
-        if (group.questions.length >= 3) {
-            group.isSituation = true;
+        if (group.length >= 3 || group.some(q => q.stem?.trim().startsWith('Situation'))) {
+            const firstQuestion = group[0];
+            if (!firstQuestion.stem?.trim().startsWith('Situation')) {
+                const firstSentence = firstQuestion.stem?.split(/[.!?]/)[0]?.trim() || 'Problem';
+                firstQuestion.stem = `Situation: ${firstSentence}. ${firstQuestion.stem}`;
+            }
         }
     });
 
-    // STEP 3: Separate into situation groups and standalone questions
-    const situationGroups = Object.values(groups)
-        .filter(group => group.isSituation)
-        .sort((a, b) => a.startIndex - b.startIndex); // Maintain original order
-    
-    const standaloneQuestions = [];
+    // Flatten groups back to array - USE ALL QUESTIONS
+    const finalQuestions = [];
     Object.values(groups).forEach(group => {
-        if (!group.isSituation) {
-            standaloneQuestions.push(...group.questions);
-        }
+        finalQuestions.push(...group);
     });
 
-    // STEP 4: Apply section-specific limits
-    const sectionName = appState.currentSection;
-    let maxSituations = 20; // Default for AMSTHEC and PSAD
-    let maxTotalQuestions = 75; // Default for AMSTHEC and PSAD
-    
-    if (sectionName === 'HPGE') {
-        maxSituations = 15;
-        maxTotalQuestions = 50;
-    }
-    
-    // Apply limits to situation groups
-    const limitedSituations = [];
-    let situationCount = 0;
-    
-    for (const group of situationGroups) {
-        // Don't start a situation group too close to the end
-        const positionIfAdded = situationCount + limitedSituations.length + 1;
-        const forbiddenStartPosition = maxTotalQuestions - Math.max(2, group.questions.length - 1);
-        
-        if (positionIfAdded <= forbiddenStartPosition && limitedSituations.length < maxSituations) {
-            limitedSituations.push(group);
-            situationCount += group.questions.length;
-        }
-    }
-    
-    // STEP 5: Format situation groups properly
-    limitedSituations.forEach(group => {
-        const firstQuestion = group.questions[0];
-        if (!firstQuestion.stem?.trim().startsWith('Situation')) {
-            // Extract meaningful context from the first sentence
-            const firstSentence = firstQuestion.stem?.split(/[.!?]/)[0]?.trim() || 'Problem';
-            firstQuestion.stem = `Situation: ${firstSentence}. ${firstQuestion.stem}`;
-        }
-    });
-
-    // STEP 6: Determine how many standalone questions to include
-    let maxStandalone = maxTotalQuestions - situationCount;
-    
-    if (sectionName === 'HPGE' && maxStandalone > 5) {
-        maxStandalone = 5; // HPGE specifically needs max 5 standalone questions
-    }
-    
-    // Limit standalone questions
-    const limitedStandalone = standaloneQuestions.slice(0, maxStandalone);
-    
-    // STEP 7: Create final groups array
-    const finalGroups = [];
-    
-    // Add situation groups
-    limitedSituations.forEach(group => {
-        finalGroups.push(group);
-    });
-    
-    // Add standalone questions as individual groups
-    limitedStandalone.forEach(q => {
-        finalGroups.push({
-            questions: [q],
-            isStandalone: true
-        });
-    });
-    
-    // STEP 8: Apply randomization while preserving group integrity
+    // Apply randomization if needed
     const shouldRandomize = appState.settings.randomizeQuestions || 
         (appState.view === 'custom-exam' && appState.customExam.randomize);
     
-    // Only randomize if explicitly enabled (default to false)
     if (shouldRandomize === true) {
-        // Randomize the groups but keep questions within groups together
-        shuffleArray(finalGroups);
+        return shuffleArray(finalQuestions);
     }
 
-    // STEP 9: Flatten the groups back to a single array
-    const finalQuestions = [];
-    finalGroups.forEach(group => {
-        finalQuestions.push(...group.questions);
-    });
-
-    // STEP 10: Ensure we don't exceed section limits
-    return finalQuestions.slice(0, maxTotalQuestions).map(q => {
-        const {originalIndex, ...rest} = q;
-        return rest;
-    });
+    return finalQuestions;
 }
 
 // Helper function: Fisher-Yates shuffle
