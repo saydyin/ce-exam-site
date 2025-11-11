@@ -62,6 +62,7 @@ const MOTIVATIONAL_QUOTES = [
     "Success is the sum of small efforts, repeated day in and day out.",
     "The future belongs to those who believe in the beauty of their dreams."
 ];
+
 // ======================
 // STATE MANAGEMENT
 // ======================
@@ -101,6 +102,7 @@ let appState = {
     },
     autoSaveEnabled: true
 };
+
 // ======================
 // QUESTION BANK MANAGEMENT
 // ======================
@@ -129,6 +131,7 @@ async function loadQuestionBank() {
         return appState.fullQuestionBank;
     }
 }
+
 function getQuestionsForSection(sectionName) {
     if (!appState.fullQuestionBank || appState.fullQuestionBank.length === 0) {
         console.warn('Question bank not loaded, using fallback questions');
@@ -148,101 +151,122 @@ function getQuestionsForSection(sectionName) {
         : SECTION_REQUIREMENTS[sectionName].total;
     return processedQuestions.slice(0, requiredTotal);
 }
+
 function processQuestionsWithGroups(questions) {
-    // First, group questions by group_id
-    const groupMap = {};
-    questions.forEach(question => {
-        const gid = question.group_id;
-        if (gid) {
-            if (!groupMap[gid]) {
-                groupMap[gid] = [];
-            }
-            groupMap[gid].push(question);
-        } else {
-            // For questions without group_id, create a unique ID
-            const tempId = `__single_${Math.random().toString(36).substring(2, 10)}`;
-            if (!groupMap[tempId]) {
-                groupMap[tempId] = [];
-            }
-            groupMap[tempId].push(question);
+    // STEP 1: Identify all question groups and their boundaries
+    const groupedQuestions = [];
+    const groupMap = new Map();
+    let currentGroup = null;
+    let standaloneCount = 0;
+
+    // First pass: identify all contiguous groups
+    questions.forEach((question, index) => {
+        // Create a unique key for grouping
+        const groupKey = question.group_id || `standalone_${standaloneCount++}`;
+        
+        // Start a new group if this is the first question or if group_id changes
+        if (currentGroup === null || currentGroup.group_id !== question.group_id) {
+            currentGroup = {
+                group_id: question.group_id,
+                questions: [],
+                startIndex: index
+            };
+            groupedQuestions.push(currentGroup);
         }
-    });
-    // Process each group to ensure "Situation" questions are first
-    const processedGroups = Object.values(groupMap).map(group => {
-        // Check if this is a valid situation group (should have 3 questions)
-        const isSituationGroup = group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3;
-        if (isSituationGroup) {
-            // Sort the group to put Situation first
-            return group.sort((a, b) => {
-                if (a.stem.trim().startsWith('Situation')) return -1;
-                if (b.stem.trim().startsWith('Situation')) return 1;
-                return 0;
+        
+        currentGroup.questions.push({...question, originalIndex: index});
+        
+        // Track group metadata
+        if (!groupMap.has(groupKey)) {
+            groupMap.set(groupKey, {
+                questions: [],
+                startIndex: index,
+                contiguous: true
             });
         }
-        // For non-situation groups, return as is
-        return group;
+        groupMap.get(groupKey).questions.push({...question, originalIndex: index});
     });
-    // Now we have all questions organized into groups
-    // We need to flatten the groups while preserving their internal order
-    // First, separate into situation groups and standalone questions
-    const situationGroups = [];
-    const standaloneQuestions = [];
-    processedGroups.forEach(group => {
-        if (group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3) {
-            situationGroups.push(group);
-        } else {
-            standaloneQuestions.push(...group);
+
+    // STEP 2: Analyze each group to determine if it's a situation group
+    groupedQuestions.forEach(group => {
+        const isSituation = (
+            // Explicitly marked as situation
+            group.questions.some(q => q.stem && q.stem.trim().startsWith('Situation')) ||
+            // Or has the characteristics of a situation group:
+            (
+                group.questions.length >= 2 && // At least 2 questions in the group
+                !group.questions.some(q => q.stem.includes('Figure 00') || q.stem.includes('Figure M')) // Not a figure-based standalone
+            )
+        );
+
+        // For situation groups, ensure the first question starts with "Situation:"
+        if (isSituation && !group.questions[0].stem.trim().startsWith('Situation')) {
+            const firstQuestion = group.questions[0];
+            const topic = firstQuestion.stem.split('.')[0]?.trim() || 'Problem';
+            
+            // Only add "Situation:" prefix if this looks like it should be one
+            if (group.questions.length >= 2 || firstQuestion.stem.length < 100) {
+                firstQuestion.stem = `Situation: ${topic}. ${firstQuestion.stem}`;
+            }
         }
     });
-    // Randomize the situation groups and standalone questions
-    const randomizedSituationGroups = appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize) 
-        ? shuffleArray(situationGroups) 
-        : situationGroups;
-    const randomizedStandalone = appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize) 
-        ? shuffleArray(standaloneQuestions) 
-        : standaloneQuestions;
-    // Create final question list with situation groups first
+
+    // STEP 3: Flatten the groups back to a single array
     let finalQuestions = [];
-    // Add situation groups
-    randomizedSituationGroups.forEach(group => {
-        finalQuestions.push(...group);
+    groupedQuestions.forEach(group => {
+        finalQuestions.push(...group.questions);
     });
-    // Add standalone questions
-    finalQuestions.push(...randomizedStandalone);
-    // For better user experience, interleave situation groups with standalone questions
-    if (appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize)) {
-        finalQuestions = [];
-        const interleaved = [];
-        let situationIndex = 0;
-        let standaloneIndex = 0;
-        // Alternate between situation groups and standalone questions
-        while (situationIndex < randomizedSituationGroups.length || standaloneIndex < randomizedStandalone.length) {
-            // Add 1 situation group (3 questions)
-            if (situationIndex < randomizedSituationGroups.length) {
-                interleaved.push(...randomizedSituationGroups[situationIndex]);
-                situationIndex++;
-            }
-            // Add 1-2 standalone questions
-            const numStandalone = Math.min(2, randomizedStandalone.length - standaloneIndex);
-            if (numStandalone > 0) {
-                for (let i = 0; i < numStandalone; i++) {
-                    interleaved.push(randomizedStandalone[standaloneIndex + i]);
-                }
-                standaloneIndex += numStandalone;
+
+    // STEP 4: Handle randomization while preserving group integrity
+    const shouldRandomize = appState.settings.randomizeQuestions || 
+        (appState.view === 'custom-exam' && appState.customExam.randomize);
+
+    if (shouldRandomize) {
+        // Create blocks for randomization - keep situation groups together
+        const blocks = [];
+        let currentBlock = [];
+        
+        for (let i = 0; i < finalQuestions.length; i++) {
+            const question = finalQuestions[i];
+            currentBlock.push(question);
+            
+            // End block if:
+            // 1. This is the last question in its group AND next question is from a different group
+            // 2. OR this is a standalone question
+            const isLastInGroup = !finalQuestions[i+1] || 
+                (finalQuestions[i+1].group_id !== question.group_id);
+                
+            if (isLastInGroup) {
+                blocks.push([...currentBlock]);
+                currentBlock = [];
             }
         }
-        finalQuestions = interleaved;
+        
+        // Randomize the blocks
+        shuffleArray(blocks);
+        
+        // Rebuild the questions array from randomized blocks
+        finalQuestions = [];
+        blocks.forEach(block => {
+            finalQuestions.push(...block);
+        });
     }
-    return finalQuestions;
+
+    // STEP 5: Remove temporary properties
+    return finalQuestions.map(q => {
+        const {originalIndex, ...rest} = q;
+        return rest;
+    });
 }
+
 function shuffleArray(array) {
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
+    for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+        [array[i], array[j]] = [array[j], array[i]];
     }
-    return newArray;
+    return array;
 }
+
 // ======================
 // UTILITY FUNCTIONS
 // ======================
@@ -253,6 +277,7 @@ function formatTime(seconds) {
     const s = seconds % 60;
     return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
 }
+
 function saveState() {
     localStorage.setItem('examAnswers', JSON.stringify(appState.answers));
     localStorage.setItem('examResults', JSON.stringify(appState.results));
@@ -264,6 +289,7 @@ function saveState() {
     localStorage.setItem('performanceData', JSON.stringify(appState.performanceData));
     localStorage.setItem('customExam', JSON.stringify(appState.customExam));
 }
+
 function showScreen(screenId) {
     document.querySelectorAll('.screen').forEach(screen => {
         screen.classList.add('hidden');
@@ -291,6 +317,7 @@ function showScreen(screenId) {
         }
     }
 }
+
 // ======================
 // TIMER & QUESTION LOADING
 // ======================
@@ -354,6 +381,7 @@ function loadQuestionsForSection(sectionName) {
         startTimer();
     }
 }
+
 function startTimer() {
     clearInterval(appState.timerInterval);
     if (appState.isPaused) return;
@@ -381,6 +409,7 @@ function startTimer() {
         }
     }, 1000);
 }
+
 function getCurrentQuestionIndex() {
     if (appState.settings.navigationMode === 'step') {
         const activeCard = document.querySelector('.question-card.active-question');
@@ -401,6 +430,7 @@ function getCurrentQuestionIndex() {
     }
     return -1;
 }
+
 function pauseTimer() {
     clearInterval(appState.timerInterval);
     appState.isPaused = true;
@@ -410,6 +440,7 @@ function pauseTimer() {
         localStorage.setItem(`examTime_${appState.currentSection}`, appState.timeLeft.toString());
     }
 }
+
 // ======================
 // RESET
 // ======================
@@ -449,6 +480,7 @@ function resetExam() {
     });
     showScreen('main-menu');
 }
+
 // ======================
 // CUSTOM EXAM BUILDER
 // ======================
@@ -499,6 +531,7 @@ function renderCustomExamBuilder() {
     document.getElementById('btn-custom-exam-back').onclick = () => showScreen('main-menu');
     document.getElementById('btn-create-custom-exam').onclick = createCustomExam;
 }
+
 function updateCustomExamSections() {
     const sections = [];
     if (document.getElementById('amsthec-include').checked) sections.push('AMSTHEC');
@@ -507,6 +540,7 @@ function updateCustomExamSections() {
     appState.customExam.sections = sections;
     saveState();
 }
+
 function createCustomExam() {
     if (appState.customExam.sections.length === 0) {
         alert('Please select at least one section for your custom exam.');
@@ -537,6 +571,7 @@ function createCustomExam() {
     showScreen('exam');
     startTimer();
 }
+
 // ======================
 // MAIN MENU
 // ======================
@@ -608,6 +643,7 @@ function renderMainMenu() {
     document.getElementById('btn-download-pdf').addEventListener('click', generateOfflinePDF);
     document.getElementById('btn-reset').addEventListener('click', resetExam);
 }
+
 // ======================
 // INSTRUCTIONS SCREEN
 // ======================
@@ -637,6 +673,7 @@ function renderInstructions() {
         startTimer();
     };
 }
+
 // ======================
 // EXAM SCREEN
 // ======================
@@ -847,6 +884,7 @@ function renderExam() {
         });
     }
 }
+
 function selectAnswer(questionIndex, choice) {
     if (appState.currentSection === null) return;
     appState.answers[appState.currentSection][questionIndex] = choice;
@@ -854,6 +892,7 @@ function selectAnswer(questionIndex, choice) {
         saveState();
     }
 }
+
 function navigateStep(direction) {
     const activeCard = document.querySelector('.question-card.active-question');
     if (!activeCard) return;
@@ -875,6 +914,7 @@ function navigateStep(direction) {
         );
     }
 }
+
 function jumpToFirstUnanswered() {
     const sectionName = appState.currentSection;
     const answers = appState.answers[sectionName];
@@ -892,6 +932,7 @@ function jumpToFirstUnanswered() {
         window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
     }
 }
+
 // ======================
 // SUBMIT EXAM
 // ======================
@@ -990,6 +1031,7 @@ function submitExam() {
     saveState();
     showScreen('results');
 }
+
 // ======================
 // ANSWER PATTERN ANALYSIS
 // ======================
@@ -1068,6 +1110,7 @@ function analyzeAnswerPatterns(questions, answers) {
     });
     return patterns;
 }
+
 // ======================
 // RESULTS SCREEN
 // ======================
@@ -1148,6 +1191,7 @@ function renderResultsScreen() {
     document.getElementById('btn-results-main-menu').onclick = () => showScreen('main-menu');
     document.getElementById('btn-review-section').onclick = () => showReviewScreen(sectionName);
 }
+
 // ======================
 // SOLUTION TEMPLATE
 // ======================
@@ -1201,6 +1245,7 @@ function showSolution(wrongQuestion) {
     // Auto-scroll to top
     window.scrollTo(0, 0);
 }
+
 function renderPerformanceHeatmap(result) {
     const ctx = document.getElementById('performance-heatmap').getContext('2d');
     const section = result.section || 'CUSTOM';
@@ -1243,6 +1288,7 @@ function renderPerformanceHeatmap(result) {
         }
     });
 }
+
 function renderStudyFocusRecommendations(result) {
     const container = document.getElementById('study-focus-container');
     container.innerHTML = '';
@@ -1276,6 +1322,7 @@ function renderStudyFocusRecommendations(result) {
     // Add recommendations
     container.innerHTML = recommendations.join('');
 }
+
 // ======================
 // REVIEW SCREEN
 // ======================
@@ -1316,6 +1363,7 @@ function showReviewScreen(sectionName) {
     // Show the screen
     showScreen('review');
 }
+
 function renderReviewQuestions() {
     const sectionName = appState.reviewingSection;
     const answers = appState.answers[sectionName];
@@ -1405,9 +1453,11 @@ function renderReviewQuestions() {
         });
     });
 }
+
 function applyReviewFilters() {
     renderReviewQuestions();
 }
+
 function renderAnswerPatternAnalysis(sectionName) {
     const container = document.getElementById('answer-patterns');
     container.innerHTML = '';
@@ -1471,6 +1521,7 @@ function renderAnswerPatternAnalysis(sectionName) {
         `;
     }
 }
+
 // ======================
 // CONFIRMATION MODAL
 // ======================
@@ -1495,6 +1546,7 @@ function showConfirmModal(title, message, onConfirm) {
     newCancelBtn.addEventListener('click', handleCancel);
     newOkBtn.addEventListener('click', handleConfirm);
 }
+
 // ======================
 // SETTINGS SCREEN
 // ======================
@@ -1610,6 +1662,7 @@ function renderSettingsScreen() {
     // Back button
     document.getElementById('btn-settings-back').addEventListener('click', () => showScreen('main-menu'));
 }
+
 // ======================
 // PDF GENERATION
 // ======================
@@ -1693,6 +1746,7 @@ function generateOfflinePDF() {
         pdfContainer.style.display = 'none';
     }, 1000);
 }
+
 // ======================
 // HTML DECODING UTILITY
 // ======================
@@ -1701,6 +1755,7 @@ function decodeHtmlEntities(text) {
     tempElement.innerHTML = text;
     return tempElement.textContent || tempElement.innerText || '';
 }
+
 // ======================
 // OTHER UTILITIES
 // ======================
@@ -1796,9 +1851,11 @@ function getFallbackQuestions() {
         }
     ];
 }
+
 function getSampleQuestions(sectionName) {
     return getFallbackQuestions().filter(q => q.section === sectionName);
 }
+
 // ======================
 // INITIALIZATION
 // ======================
