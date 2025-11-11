@@ -160,23 +160,84 @@ function getQuestionsForSection(sectionName) {
 }
 
 function processQuestionsWithGroups(questions) {
-    // First, group questions by group_id
-    const groupMap = {};
-    questions.forEach(question => {
-        const gid = question.group_id;
-        if (gid) {
-            if (!groupMap[gid]) {
-                groupMap[gid] = [];
+    // === STEP 1: Promote trailing same-group triplets to Situation blocks ===
+    const updated = [...questions];
+    const n = updated.length;
+
+    if (n >= 3) {
+        // Scan from the end backwards in steps of 1
+        for (let i = n - 3; i >= 0; i--) {
+            const q1 = updated[i];
+            const q2 = updated[i + 1];
+            const q3 = updated[i + 2];
+
+            const sameGroup = q1.group_id && q1.group_id === q2.group_id && q1.group_id === q3.group_id;
+            const noneAreSituation = !q1.stem.trim().startsWith('Situation') &&
+                                     !q2.stem.trim().startsWith('Situation') &&
+                                     !q3.stem.trim().startsWith('Situation');
+
+            if (sameGroup && noneAreSituation) {
+                // Promote first question to Situation
+                const originalStem = q1.stem.trim();
+                const firstSentence = originalStem.split(/(?<=\.)\s+/)[0] || originalStem;
+                updated[i].stem = `Situation: ${firstSentence}. ${originalStem}`;
             }
-            groupMap[gid].push(question);
-        } else {
-            // For questions without group_id, create a unique ID
-            const tempId = `__single_${Math.random().toString(36).substring(2, 10)}`;
-            if (!groupMap[tempId]) {
-                groupMap[tempId] = [];
-            }
-            groupMap[tempId].push(question);
         }
+    }
+
+    // === STEP 2: Group and organize questions (existing logic) ===
+    const groupMap = {};
+    updated.forEach(question => {
+        const gid = question.group_id || `__single_${Math.random().toString(36).substring(2, 10)}`;
+        if (!groupMap[gid]) groupMap[gid] = [];
+        groupMap[gid].push(question);
+    });
+
+    const processedGroups = Object.values(groupMap).map(group => {
+        const isSituationGroup = group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3;
+        if (isSituationGroup) {
+            return group.sort((a, b) =>
+                a.stem.trim().startsWith('Situation') ? -1 :
+                b.stem.trim().startsWith('Situation') ? 1 : 0
+            );
+        }
+        return group;
+    });
+
+    const situationGroups = [];
+    const standaloneQuestions = [];
+    processedGroups.forEach(group => {
+        if (group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3) {
+            situationGroups.push(group);
+        } else {
+            standaloneQuestions.push(...group);
+        }
+    });
+
+    const shouldRandomize = appState.settings.randomizeQuestions ||
+        (appState.view === 'custom-exam' && appState.customExam.randomize);
+
+    const randomizedSituationGroups = shouldRandomize ? shuffleArray(situationGroups) : situationGroups;
+    const randomizedStandalone = shouldRandomize ? shuffleArray(standaloneQuestions) : standaloneQuestions;
+
+    let finalQuestions = [];
+    if (shouldRandomize) {
+        const interleaved = [];
+        let sIdx = 0, stIdx = 0;
+        while (sIdx < randomizedSituationGroups.length || stIdx < randomizedStandalone.length) {
+            if (sIdx < randomizedSituationGroups.length) {
+                interleaved.push(...randomizedSituationGroups[sIdx++]);
+            }
+            const numSt = Math.min(2, randomizedStandalone.length - stIdx);
+            for (let i = 0; i < numSt; i++) interleaved.push(randomizedStandalone[stIdx++]);
+        }
+        finalQuestions = interleaved;
+    } else {
+        finalQuestions = [...situationGroups.flat(), ...standaloneQuestions];
+    }
+
+    return finalQuestions;
+}
     });
     
     // Process each group to ensure "Situation" questions are first
@@ -2091,3 +2152,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         form.addEventListener('submit', e => e.preventDefault());
     });
 });
+
