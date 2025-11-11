@@ -62,7 +62,6 @@ const MOTIVATIONAL_QUOTES = [
     "Success is the sum of small efforts, repeated day in and day out.",
     "The future belongs to those who believe in the beauty of their dreams."
 ];
-
 // ======================
 // STATE MANAGEMENT
 // ======================
@@ -102,7 +101,6 @@ let appState = {
     },
     autoSaveEnabled: true
 };
-
 // ======================
 // QUESTION BANK MANAGEMENT
 // ======================
@@ -114,7 +112,6 @@ async function loadQuestionBank() {
         }
         const questionBank = await response.json();
         console.log(`Loaded ${questionBank.length} questions from question bank`);
-        
         // Add difficulty ratings to questions
         questionBank.forEach(q => {
             if (!q.difficulty) {
@@ -124,7 +121,6 @@ async function loadQuestionBank() {
                 else if (q.section === 'PSAD') q.difficulty = ['medium', 'medium', 'hard'][Math.floor(Math.random() * 3)];
             }
         });
-        
         appState.fullQuestionBank = questionBank;
         return questionBank;
     } catch (error) {
@@ -133,118 +129,48 @@ async function loadQuestionBank() {
         return appState.fullQuestionBank;
     }
 }
-
 function getQuestionsForSection(sectionName) {
     if (!appState.fullQuestionBank || appState.fullQuestionBank.length === 0) {
         console.warn('Question bank not loaded, using fallback questions');
         return getSampleQuestions(sectionName);
     }
-    
     // Get questions for this section
     let sectionQuestions = appState.fullQuestionBank.filter(q => q.section === sectionName);
-    
     // Apply difficulty filter if in custom exam mode
     if (appState.view === 'custom-exam' && appState.customExam.difficulty !== 'all') {
         sectionQuestions = sectionQuestions.filter(q => q.difficulty === appState.customExam.difficulty);
     }
-    
     // Process questions with groups
     const processedQuestions = processQuestionsWithGroups(sectionQuestions);
-    
     // Apply custom exam question count if applicable
     const requiredTotal = (appState.view === 'custom-exam') 
         ? Math.min(processedQuestions.length, appState.customExam.questionCount) 
         : SECTION_REQUIREMENTS[sectionName].total;
-    
     return processedQuestions.slice(0, requiredTotal);
 }
-
 function processQuestionsWithGroups(questions) {
-    // === STEP 1: Promote trailing same-group triplets to Situation blocks ===
-    const updated = [...questions];
-    const n = updated.length;
-
-    if (n >= 3) {
-        // Scan from the end backwards in steps of 1
-        for (let i = n - 3; i >= 0; i--) {
-            const q1 = updated[i];
-            const q2 = updated[i + 1];
-            const q3 = updated[i + 2];
-
-            const sameGroup = q1.group_id && q1.group_id === q2.group_id && q1.group_id === q3.group_id;
-            const noneAreSituation = !q1.stem.trim().startsWith('Situation') &&
-                                     !q2.stem.trim().startsWith('Situation') &&
-                                     !q3.stem.trim().startsWith('Situation');
-
-            if (sameGroup && noneAreSituation) {
-                // Promote first question to Situation
-                const originalStem = q1.stem.trim();
-                const firstSentence = originalStem.split(/(?<=\.)\s+/)[0] || originalStem;
-                updated[i].stem = `Situation: ${firstSentence}. ${originalStem}`;
-            }
-        }
-    }
-
-    // === STEP 2: Group and organize questions (existing logic) ===
+    // First, group questions by group_id
     const groupMap = {};
-    updated.forEach(question => {
-        const gid = question.group_id || `__single_${Math.random().toString(36).substring(2, 10)}`;
-        if (!groupMap[gid]) groupMap[gid] = [];
-        groupMap[gid].push(question);
-    });
-
-    const processedGroups = Object.values(groupMap).map(group => {
-        const isSituationGroup = group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3;
-        if (isSituationGroup) {
-            return group.sort((a, b) =>
-                a.stem.trim().startsWith('Situation') ? -1 :
-                b.stem.trim().startsWith('Situation') ? 1 : 0
-            );
-        }
-        return group;
-    });
-
-    const situationGroups = [];
-    const standaloneQuestions = [];
-    processedGroups.forEach(group => {
-        if (group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3) {
-            situationGroups.push(group);
-        } else {
-            standaloneQuestions.push(...group);
-        }
-    });
-
-    const shouldRandomize = appState.settings.randomizeQuestions ||
-        (appState.view === 'custom-exam' && appState.customExam.randomize);
-
-    const randomizedSituationGroups = shouldRandomize ? shuffleArray(situationGroups) : situationGroups;
-    const randomizedStandalone = shouldRandomize ? shuffleArray(standaloneQuestions) : standaloneQuestions;
-
-    let finalQuestions = [];
-    if (shouldRandomize) {
-        const interleaved = [];
-        let sIdx = 0, stIdx = 0;
-        while (sIdx < randomizedSituationGroups.length || stIdx < randomizedStandalone.length) {
-            if (sIdx < randomizedSituationGroups.length) {
-                interleaved.push(...randomizedSituationGroups[sIdx++]);
+    questions.forEach(question => {
+        const gid = question.group_id;
+        if (gid) {
+            if (!groupMap[gid]) {
+                groupMap[gid] = [];
             }
-            const numSt = Math.min(2, randomizedStandalone.length - stIdx);
-            for (let i = 0; i < numSt; i++) interleaved.push(randomizedStandalone[stIdx++]);
+            groupMap[gid].push(question);
+        } else {
+            // For questions without group_id, create a unique ID
+            const tempId = `__single_${Math.random().toString(36).substring(2, 10)}`;
+            if (!groupMap[tempId]) {
+                groupMap[tempId] = [];
+            }
+            groupMap[tempId].push(question);
         }
-        finalQuestions = interleaved;
-    } else {
-        finalQuestions = [...situationGroups.flat(), ...standaloneQuestions];
-    }
-
-    return finalQuestions;
-}
     });
-    
     // Process each group to ensure "Situation" questions are first
     const processedGroups = Object.values(groupMap).map(group => {
         // Check if this is a valid situation group (should have 3 questions)
         const isSituationGroup = group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3;
-        
         if (isSituationGroup) {
             // Sort the group to put Situation first
             return group.sort((a, b) => {
@@ -253,18 +179,14 @@ function processQuestionsWithGroups(questions) {
                 return 0;
             });
         }
-        
         // For non-situation groups, return as is
         return group;
     });
-    
     // Now we have all questions organized into groups
     // We need to flatten the groups while preserving their internal order
-    
     // First, separate into situation groups and standalone questions
     const situationGroups = [];
     const standaloneQuestions = [];
-    
     processedGroups.forEach(group => {
         if (group.some(q => q.stem.trim().startsWith('Situation')) && group.length === 3) {
             situationGroups.push(group);
@@ -272,35 +194,27 @@ function processQuestionsWithGroups(questions) {
             standaloneQuestions.push(...group);
         }
     });
-    
     // Randomize the situation groups and standalone questions
     const randomizedSituationGroups = appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize) 
         ? shuffleArray(situationGroups) 
         : situationGroups;
-        
     const randomizedStandalone = appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize) 
         ? shuffleArray(standaloneQuestions) 
         : standaloneQuestions;
-    
     // Create final question list with situation groups first
     let finalQuestions = [];
-    
     // Add situation groups
     randomizedSituationGroups.forEach(group => {
         finalQuestions.push(...group);
     });
-    
     // Add standalone questions
     finalQuestions.push(...randomizedStandalone);
-    
     // For better user experience, interleave situation groups with standalone questions
     if (appState.settings.randomizeQuestions || (appState.view === 'custom-exam' && appState.customExam.randomize)) {
         finalQuestions = [];
-        
         const interleaved = [];
         let situationIndex = 0;
         let standaloneIndex = 0;
-        
         // Alternate between situation groups and standalone questions
         while (situationIndex < randomizedSituationGroups.length || standaloneIndex < randomizedStandalone.length) {
             // Add 1 situation group (3 questions)
@@ -308,7 +222,6 @@ function processQuestionsWithGroups(questions) {
                 interleaved.push(...randomizedSituationGroups[situationIndex]);
                 situationIndex++;
             }
-            
             // Add 1-2 standalone questions
             const numStandalone = Math.min(2, randomizedStandalone.length - standaloneIndex);
             if (numStandalone > 0) {
@@ -318,13 +231,10 @@ function processQuestionsWithGroups(questions) {
                 standaloneIndex += numStandalone;
             }
         }
-        
         finalQuestions = interleaved;
     }
-    
     return finalQuestions;
 }
-
 function shuffleArray(array) {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -333,7 +243,6 @@ function shuffleArray(array) {
     }
     return newArray;
 }
-
 // ======================
 // UTILITY FUNCTIONS
 // ======================
@@ -344,7 +253,6 @@ function formatTime(seconds) {
     const s = seconds % 60;
     return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
 }
-
 function saveState() {
     localStorage.setItem('examAnswers', JSON.stringify(appState.answers));
     localStorage.setItem('examResults', JSON.stringify(appState.results));
@@ -356,7 +264,6 @@ function saveState() {
     localStorage.setItem('performanceData', JSON.stringify(appState.performanceData));
     localStorage.setItem('customExam', JSON.stringify(appState.customExam));
 }
-
 function showScreen(screenId) {
     document.querySelectorAll('.screen').forEach(screen => {
         screen.classList.add('hidden');
@@ -384,7 +291,6 @@ function showScreen(screenId) {
         }
     }
 }
-
 // ======================
 // TIMER & QUESTION LOADING
 // ======================
@@ -411,27 +317,22 @@ function loadQuestionsForSection(sectionName) {
             appState.timeLeft = parseInt(savedTime);
         }
     }
-    
     // Initialize question times
     if (!appState.questionTimes[sectionName]) {
         appState.questionTimes[sectionName] = new Array(sectionQuestions.length).fill(0);
     }
-    
     // Initialize flagged questions
     if (!appState.flaggedQuestions[sectionName]) {
         appState.flaggedQuestions[sectionName] = new Array(sectionQuestions.length).fill(false);
     }
-    
     // Initialize notes
     if (!appState.questionNotes[sectionName]) {
         appState.questionNotes[sectionName] = new Array(sectionQuestions.length).fill('');
     }
-    
     // Initialize difficulty ratings
     if (!appState.questionDifficulty[sectionName]) {
         appState.questionDifficulty[sectionName] = new Array(sectionQuestions.length).fill('medium');
     }
-    
     // Initialize performance data
     if (!appState.performanceData[sectionName]) {
         appState.performanceData[sectionName] = {
@@ -446,7 +347,6 @@ function loadQuestionsForSection(sectionName) {
             }
         };
     }
-    
     if (document.getElementById('exam-timer')) {
         document.getElementById('exam-timer').textContent = formatTime(appState.timeLeft);
     }
@@ -454,13 +354,10 @@ function loadQuestionsForSection(sectionName) {
         startTimer();
     }
 }
-
 function startTimer() {
     clearInterval(appState.timerInterval);
     if (appState.isPaused) return;
-    
     let lastQuestionTime = Date.now();
-    
     appState.timerInterval = setInterval(() => {
         appState.timeLeft--;
         if (document.getElementById('exam-timer')) {
@@ -470,14 +367,12 @@ function startTimer() {
             clearInterval(appState.timerInterval);
             submitExam();
         }
-        
         // Track time spent on current question
         const currentQuestionIndex = getCurrentQuestionIndex();
         if (currentQuestionIndex !== -1) {
             const now = Date.now();
             const timeSpent = Math.floor((now - lastQuestionTime) / 1000);
             lastQuestionTime = now;
-            
             if (!appState.questionTimes[appState.currentSection]) {
                 appState.questionTimes[appState.currentSection] = new Array(appState.examQuestions.length).fill(0);
             }
@@ -486,7 +381,6 @@ function startTimer() {
         }
     }, 1000);
 }
-
 function getCurrentQuestionIndex() {
     if (appState.settings.navigationMode === 'step') {
         const activeCard = document.querySelector('.question-card.active-question');
@@ -507,18 +401,15 @@ function getCurrentQuestionIndex() {
     }
     return -1;
 }
-
 function pauseTimer() {
     clearInterval(appState.timerInterval);
     appState.isPaused = true;
     saveState();
-    
     // Save remaining time for this section
     if (appState.currentSection) {
         localStorage.setItem(`examTime_${appState.currentSection}`, appState.timeLeft.toString());
     }
 }
-
 // ======================
 // RESET
 // ======================
@@ -543,7 +434,6 @@ function resetExam() {
         questionCount: 100,
         timeLimit: 4 * 60 * 60
     };
-    
     localStorage.removeItem('examAnswers');
     localStorage.removeItem('examResults');
     localStorage.removeItem('examSettings');
@@ -553,15 +443,12 @@ function resetExam() {
     localStorage.removeItem('examDifficulty');
     localStorage.removeItem('performanceData');
     localStorage.removeItem('customExam');
-    
     Object.keys(SECTIONS).forEach(sectionName => {
         localStorage.removeItem(`examQuestions_${sectionName}`);
         localStorage.removeItem(`examTime_${sectionName}`);
     });
-    
     showScreen('main-menu');
 }
-
 // ======================
 // CUSTOM EXAM BUILDER
 // ======================
@@ -570,107 +457,86 @@ function renderCustomExamBuilder() {
     document.getElementById('amsthec-include').checked = appState.customExam.sections.includes('AMSTHEC');
     document.getElementById('hpge-include').checked = appState.customExam.sections.includes('HPGE');
     document.getElementById('psad-include').checked = appState.customExam.sections.includes('PSAD');
-    
     document.getElementById('randomize-questions').checked = appState.customExam.randomize;
     document.getElementById('include-timer').checked = true; // Always include timer for custom exams
     document.getElementById('difficulty-filter').value = appState.customExam.difficulty;
-    
     document.getElementById('question-count').value = appState.customExam.questionCount;
     document.getElementById('question-count-value').textContent = appState.customExam.questionCount;
-    
     const timeHours = Math.floor(appState.customExam.timeLimit / 3600);
     document.getElementById('time-limit').value = timeHours;
     document.getElementById('time-limit-value').textContent = `${timeHours} hours`;
-    
     // Set up event listeners
     document.getElementById('question-count').oninput = function() {
         document.getElementById('question-count-value').textContent = this.value;
         appState.customExam.questionCount = parseInt(this.value);
         saveState();
     };
-    
     document.getElementById('time-limit').oninput = function() {
         const hours = parseInt(this.value);
         document.getElementById('time-limit-value').textContent = `${hours} hours`;
         appState.customExam.timeLimit = hours * 3600;
         saveState();
     };
-    
     document.getElementById('difficulty-filter').onchange = function() {
         appState.customExam.difficulty = this.value;
         saveState();
     };
-    
     document.getElementById('randomize-questions').onchange = function() {
         appState.customExam.randomize = this.checked;
         saveState();
     };
-    
     // Section checkboxes
     document.getElementById('amsthec-include').onchange = function() {
         updateCustomExamSections();
     };
-    
     document.getElementById('hpge-include').onchange = function() {
         updateCustomExamSections();
     };
-    
     document.getElementById('psad-include').onchange = function() {
         updateCustomExamSections();
     };
-    
     // Button actions
     document.getElementById('btn-custom-exam-back').onclick = () => showScreen('main-menu');
     document.getElementById('btn-create-custom-exam').onclick = createCustomExam;
 }
-
 function updateCustomExamSections() {
     const sections = [];
     if (document.getElementById('amsthec-include').checked) sections.push('AMSTHEC');
     if (document.getElementById('hpge-include').checked) sections.push('HPGE');
     if (document.getElementById('psad-include').checked) sections.push('PSAD');
-    
     appState.customExam.sections = sections;
     saveState();
 }
-
 function createCustomExam() {
     if (appState.customExam.sections.length === 0) {
         alert('Please select at least one section for your custom exam.');
         return;
     }
-    
     // Create a combined exam from selected sections
     let allQuestions = [];
     let totalQuestions = 0;
-    
     appState.customExam.sections.forEach(sectionName => {
         const sectionQuestions = getQuestionsForSection(sectionName);
         allQuestions = allQuestions.concat(sectionQuestions);
         totalQuestions += sectionQuestions.length;
     });
-    
     // Shuffle and limit to requested count
     allQuestions = shuffleArray(allQuestions);
     allQuestions = allQuestions.slice(0, appState.customExam.questionCount);
-    
     // Set up exam state
     appState.currentSection = 'CUSTOM';
     appState.examQuestions = allQuestions;
     appState.timeLeft = appState.customExam.timeLimit;
-    
     // Initialize answer tracking
     appState.answers.CUSTOM = new Array(allQuestions.length).fill(null);
     appState.flaggedQuestions.CUSTOM = new Array(allQuestions.length).fill(false);
     appState.questionNotes.CUSTOM = new Array(allQuestions.length).fill('');
     appState.questionTimes.CUSTOM = new Array(allQuestions.length).fill(0);
-    
     // Start the exam
     saveState();
     showScreen('exam');
     startTimer();
 }
-
 // ======================
 // MAIN MENU
 // ======================
@@ -685,12 +551,10 @@ function renderMainMenu() {
         const score = isCompleted ? appState.results[section.name].score_pct : null;
         const card = document.createElement('div');
         card.className = 'section-card';
-        
         // Determine button text and class
         let buttonText = '';
         let buttonClass = '';
         let timerDisplay = '';
-        
         if (isCompleted) {
             buttonText = 'Review Section';
             buttonClass = 'btn-secondary';
@@ -703,11 +567,10 @@ function renderMainMenu() {
             buttonText = 'Start Section';
             buttonClass = 'btn-primary';
         }
-        
         card.innerHTML = `
             <div class="section-card-header">
                 <h2 class="section-card-title">
-                    <span>${['📐','🗺️','📊'][idx % 3]}</span>
+                    <span>${['📚','📐️','🧱'][idx % 3]}</span>
                     ${section.name}
                 </h2>
                 ${isCompleted ? `<span class="section-card-score">${score.toFixed(1)}%</span>` : ''}
@@ -723,10 +586,8 @@ function renderMainMenu() {
                 </div>
             ` : ''}
         `;
-        
         grid.appendChild(card);
     });
-
     // Add event listeners
     document.querySelectorAll('[data-action="start"], [data-action="continue"]').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -735,21 +596,18 @@ function renderMainMenu() {
             showScreen('instructions');
         });
     });
-    
     document.querySelectorAll('[data-action="review"]').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const sectionName = e.target.dataset.section;
             showReviewScreen(sectionName);
         });
     });
-    
     // Set up other buttons
     document.getElementById('btn-custom-exam').addEventListener('click', () => showScreen('custom-exam'));
     document.getElementById('btn-settings').addEventListener('click', () => showScreen('settings'));
     document.getElementById('btn-download-pdf').addEventListener('click', generateOfflinePDF);
     document.getElementById('btn-reset').addEventListener('click', resetExam);
 }
-
 // ======================
 // INSTRUCTIONS SCREEN
 // ======================
@@ -768,7 +626,6 @@ function renderInstructions() {
     });
     const quote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
     document.getElementById('motivational-quote').textContent = `"${quote}"`;
-    
     // Set up button actions
     document.getElementById('btn-instructions-back').onclick = () => showScreen('main-menu');
     document.getElementById('btn-start-exam').onclick = () => {
@@ -780,7 +637,6 @@ function renderInstructions() {
         startTimer();
     };
 }
-
 // ======================
 // EXAM SCREEN
 // ======================
@@ -788,17 +644,13 @@ function renderExam() {
     const section = appState.currentSection === 'CUSTOM' 
         ? { title: 'Custom Exam' } 
         : SECTIONS[appState.currentSection];
-    
     const totalQuestions = appState.examQuestions.length;
     document.getElementById('exam-section-title').textContent = section.title;
     document.getElementById('exam-progress').textContent = `Question 1 of ${totalQuestions}`;
-    
     // Apply theme and font size
     document.body.className = `${appState.settings.theme} font-${appState.settings.fontSize} nav-${appState.settings.navigationMode}`;
-    
     const container = document.getElementById('exam-questions-container');
     container.innerHTML = '';
-    
     // Render all questions
     appState.examQuestions.forEach((question, index) => {
         const userAnswer = appState.answers[appState.currentSection][index];
@@ -808,14 +660,12 @@ function renderExam() {
             ? `(${Math.floor(timeSpent / 60)}m ${timeSpent % 60}s)` 
             : '';
         const difficulty = appState.questionDifficulty[appState.currentSection]?.[index] || 'medium';
-        
         const questionCard = document.createElement('div');
         questionCard.className = `question-card ${isFlagged ? 'flagged-question' : ''}`;
         questionCard.id = `question-${index}`;
         if (appState.settings.navigationMode === 'step' && index === 0) {
             questionCard.classList.add('active-question');
         }
-
         questionCard.innerHTML = `
             <div class="question-header">
                 <div>
@@ -856,7 +706,6 @@ function renderExam() {
         `;
         container.appendChild(questionCard);
     });
-
     // Add event listeners for choices
     document.querySelectorAll('.choice-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -864,14 +713,12 @@ function renderExam() {
             const questionIndex = parseInt(btnEl.dataset.question);
             const choice = btnEl.dataset.choice;
             selectAnswer(questionIndex, choice);
-            
             // Visual feedback
             const questionCard = document.getElementById(`question-${questionIndex}`);
             questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => {
                 choiceBtn.classList.remove('selected');
             });
             btnEl.classList.add('selected');
-            
             // Navigation
             if (appState.settings.navigationMode === 'scroll') {
                 const nextIndex = questionIndex + 1;
@@ -888,14 +735,12 @@ function renderExam() {
             } else if (appState.settings.navigationMode === 'step') {
                 navigateStep(1);
             }
-            
             // Auto-save
             if (appState.settings.autoSave) {
                 saveState();
             }
         });
     });
-
     // Add flagging functionality
     document.querySelectorAll('.toggle-flag').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -903,7 +748,6 @@ function renderExam() {
             const isFlagged = !appState.flaggedQuestions[appState.currentSection][questionIndex];
             appState.flaggedQuestions[appState.currentSection][questionIndex] = isFlagged;
             saveState();
-            
             // Update UI
             const questionCard = document.getElementById(`question-${questionIndex}`);
             if (isFlagged) {
@@ -921,7 +765,6 @@ function renderExam() {
             }
         });
     });
-
     // Add note-taking functionality
     document.querySelectorAll('.show-note').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -930,19 +773,16 @@ function renderExam() {
             noteContainer.classList.toggle('hidden');
         });
     });
-
     document.querySelectorAll('.save-note').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const questionIndex = parseInt(e.target.dataset.question);
             const textarea = document.querySelector(`.note-container[data-note="${questionIndex}"] textarea`);
             const note = textarea.value;
-            
             if (!appState.questionNotes[appState.currentSection]) {
                 appState.questionNotes[appState.currentSection] = new Array(appState.examQuestions.length).fill('');
             }
             appState.questionNotes[appState.currentSection][questionIndex] = note;
             saveState();
-            
             // Show confirmation
             const btnText = btn.textContent;
             btn.textContent = 'Saved!';
@@ -951,7 +791,6 @@ function renderExam() {
             }, 1000);
         });
     });
-
     // Add image zoom functionality
     document.querySelectorAll('img[data-figure]').forEach(img => {
         img.addEventListener('click', () => {
@@ -959,7 +798,6 @@ function renderExam() {
             document.getElementById('image-modal').classList.remove('hidden');
         });
     });
-
     // Button actions
     document.getElementById('btn-pause-resume').onclick = () => {
         if (appState.isPaused) {
@@ -979,7 +817,6 @@ function renderExam() {
             `;
         }
     };
-
     document.getElementById('btn-submit-exam').onclick = () => {
         showConfirmModal(
             "Confirm Submission",
@@ -987,13 +824,10 @@ function renderExam() {
             submitExam
         );
     };
-
     document.getElementById('btn-jump-to-first').onclick = jumpToFirstUnanswered;
-
     document.getElementById('btn-nav-next').onclick = () => {
         navigateStep(1);
     };
-
     // Keyboard navigation for step mode
     if (appState.settings.navigationMode === 'step') {
         document.addEventListener('keydown', (e) => {
@@ -1013,7 +847,6 @@ function renderExam() {
         });
     }
 }
-
 function selectAnswer(questionIndex, choice) {
     if (appState.currentSection === null) return;
     appState.answers[appState.currentSection][questionIndex] = choice;
@@ -1021,14 +854,11 @@ function selectAnswer(questionIndex, choice) {
         saveState();
     }
 }
-
 function navigateStep(direction) {
     const activeCard = document.querySelector('.question-card.active-question');
     if (!activeCard) return;
-    
     let currentIndex = parseInt(activeCard.id.split('-')[1]);
     let nextIndex = currentIndex + direction;
-    
     if (nextIndex >= 0 && nextIndex < appState.examQuestions.length) {
         activeCard.classList.remove('active-question');
         const nextCard = document.getElementById(`question-${nextIndex}`);
@@ -1045,17 +875,14 @@ function navigateStep(direction) {
         );
     }
 }
-
 function jumpToFirstUnanswered() {
     const sectionName = appState.currentSection;
     const answers = appState.answers[sectionName];
     const firstUnansweredIndex = answers.findIndex(answer => answer === null);
-    
     if (firstUnansweredIndex === -1) {
         alert("All questions have been answered!");
         return;
     }
-    
     const targetEl = document.getElementById(`question-${firstUnansweredIndex}`);
     if (targetEl) {
         const header = document.querySelector('.exam-header');
@@ -1065,7 +892,6 @@ function jumpToFirstUnanswered() {
         window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
     }
 }
-
 // ======================
 // SUBMIT EXAM
 // ======================
@@ -1074,11 +900,9 @@ function submitExam() {
     const sectionName = appState.currentSection;
     const questions = appState.examQuestions;
     const answers = appState.answers[sectionName];
-    
     let correctCount = 0;
     const wrongAnswers = [];
     const topicPerformance = {};
-    
     // Initialize topic performance tracking
     const section = sectionName === 'CUSTOM' ? { topics: [] } : SECTIONS[sectionName];
     if (section.topics) {
@@ -1089,17 +913,14 @@ function submitExam() {
             };
         });
     }
-    
     questions.forEach((question, index) => {
         const userAnswer = answers[index];
         const isCorrect = userAnswer === question.correct_answer;
-        
         // Track topic performance
         if (section.topics && question.topic && topicPerformance[question.topic]) {
             topicPerformance[question.topic].total++;
             if (isCorrect) topicPerformance[question.topic].correct++;
         }
-        
         if (isCorrect) {
             correctCount++;
         } else {
@@ -1119,7 +940,6 @@ function submitExam() {
                 topic: question.topic
             });
         }
-        
         // Track performance data for future analysis
         if (!appState.performanceData[sectionName]) {
             appState.performanceData[sectionName] = {
@@ -1134,10 +954,8 @@ function submitExam() {
                 }
             };
         }
-        
         const difficulty = question.difficulty || 'medium';
         appState.performanceData[sectionName].difficultyDistribution[difficulty]++;
-        
         if (question.topic) {
             if (!appState.performanceData[sectionName].topicPerformance[question.topic]) {
                 appState.performanceData[sectionName].topicPerformance[question.topic] = {
@@ -1151,16 +969,13 @@ function submitExam() {
             }
         }
     });
-
     // Calculate answer patterns
     const answerPatterns = analyzeAnswerPatterns(questions, answers);
-    
     if (wrongAnswers.length > 0) {
         appState.firstWrongIndex = wrongAnswers[0].number - 1;
     } else {
         appState.firstWrongIndex = null;
     }
-
     const score_pct = (correctCount / questions.length) * 100;
     appState.results[sectionName] = {
         score_pct,
@@ -1171,12 +986,10 @@ function submitExam() {
         topicPerformance: topicPerformance,
         answerPatterns: answerPatterns
     };
-    
     appState.isPaused = false;
     saveState();
     showScreen('results');
 }
-
 // ======================
 // ANSWER PATTERN ANALYSIS
 // ======================
@@ -1195,7 +1008,6 @@ function analyzeAnswerPatterns(questions, answers) {
         },
         topicPerformance: {}
     };
-    
     // Analyze common mistakes
     const mistakeMap = {};
     questions.forEach((q, index) => {
@@ -1212,7 +1024,6 @@ function analyzeAnswerPatterns(questions, answers) {
             mistakeMap[mistakeKey].count++;
         }
     });
-    
     // Get top 3 common mistakes
     const mistakesArray = Object.values(mistakeMap).sort((a, b) => b.count - a.count).slice(0, 3);
     mistakesArray.forEach(mistake => {
@@ -1223,12 +1034,10 @@ function analyzeAnswerPatterns(questions, answers) {
             count: mistake.count
         });
     });
-    
     // Analyze streaks
     let currentStreak = 0;
     let maxStreak = 0;
     let currentStreakType = null;
-    
     questions.forEach((q, index) => {
         const isCorrect = answers[index] === q.correct_answer;
         if (isCorrect) {
@@ -1253,15 +1062,12 @@ function analyzeAnswerPatterns(questions, answers) {
             }
         }
     });
-    
     patterns.streakAnalysis.push({
         maxCorrectStreak: maxStreak,
         maxWrongStreak: maxStreak
     });
-    
     return patterns;
 }
-
 // ======================
 // RESULTS SCREEN
 // ======================
@@ -1272,27 +1078,22 @@ function renderResultsScreen() {
         ? { title: 'Custom Exam' } 
         : SECTIONS[sectionName];
     const passed = result.score_pct >= 70;
-    
     // Update results elements
     document.getElementById('results-section-title').textContent = section.title;
     document.getElementById('score-message').textContent = passed 
         ? 'Congratulations! You Passed!' 
         : 'Review Required. You Did Not Pass.';
-    
     document.getElementById('results-score').className = `score ${passed ? 'pass' : 'fail'}`;
     document.getElementById('results-score').textContent = `${result.score_pct.toFixed(1)}%`;
-    
     document.getElementById('total-questions').textContent = result.total;
     document.getElementById('correct-answers').textContent = result.correct;
     document.getElementById('wrong-answers').textContent = result.total - result.correct;
-    
     // Show/hide wrong answers section
     const wrongAnswersSection = document.getElementById('wrong-answers-section');
     if (result.wrong.length > 0) {
         wrongAnswersSection.classList.remove('hidden');
         const wrongAnswersList = document.getElementById('wrong-answers-list');
         wrongAnswersList.innerHTML = '';
-        
         result.wrong.forEach(wrong => {
             let choicesHtml = '';
             wrong.choices.forEach((choice, index) => {
@@ -1301,7 +1102,6 @@ function renderResultsScreen() {
                 const isUser = letter === wrong.user_answer && !isCorrect;
                 const bgClass = isCorrect ? 'bg-green-100' : (isUser ? 'bg-red-100' : '');
                 const borderClass = isCorrect ? 'border-green-500' : (isUser ? 'border-red-500' : 'border-gray-200');
-                
                 choicesHtml += `
                     <div class="choice-btn ${bgClass} ${borderClass}">
                         <span class="choice-letter">${letter}.</span>
@@ -1309,7 +1109,6 @@ function renderResultsScreen() {
                     </div>
                 `;
             });
-            
             const wrongCard = document.createElement('div');
             wrongCard.className = 'wrong-answer-card';
             wrongCard.innerHTML = `
@@ -1332,29 +1131,23 @@ function renderResultsScreen() {
                     <button type="button" class="btn btn-primary btn-sm mt-2 view-solution">View Solution</button>
                 </div>
             `;
-            
             // Add solution button functionality
             wrongCard.querySelector('.view-solution').addEventListener('click', () => {
                 showSolution(wrong);
             });
-            
             wrongAnswersList.appendChild(wrongCard);
         });
     } else {
         wrongAnswersSection.classList.add('hidden');
     }
-    
     // Render performance heatmap
     renderPerformanceHeatmap(result);
-    
     // Generate study focus recommendations
     renderStudyFocusRecommendations(result);
-    
     // Set up button actions
     document.getElementById('btn-results-main-menu').onclick = () => showScreen('main-menu');
     document.getElementById('btn-review-section').onclick = () => showReviewScreen(sectionName);
 }
-
 // ======================
 // SOLUTION TEMPLATE
 // ======================
@@ -1366,34 +1159,26 @@ function showSolution(wrongQuestion) {
     solutionModal.innerHTML = `
         <div class="modal-content" style="max-width: 80%; max-height: 80vh; overflow-y: auto; position: relative;">
             <h2 class="section-title">Question ${wrongQuestion.number}</h2>
-            
             <div class="question-stem mb-4">${wrongQuestion.stem}</div>
-            
             <div class="solution-header mb-4">
                 <h3>Solution</h3>
                 <button type="button" class="btn btn-primary close-solution">Close</button>
             </div>
-            
             <div class="solution-content">
                 <div class="solution-steps">
                     <h4>Step 1: Understanding the Problem</h4>
                     <p>${wrongQuestion.solution?.step1 || 'This is where the explanation would begin, breaking down how to approach the question.'}</p>
-                    
                     <h4>Step 2: Key Formulas</h4>
                     <p>${wrongQuestion.solution?.step2 || 'Relevant formulas would be listed here with explanations of each variable.'}</p>
-                    
                     <h4>Step 3: Calculation</h4>
                     <p>${wrongQuestion.solution?.step3 || 'Detailed calculation process showing how to arrive at the answer.'}</p>
-                    
                     <h4>Step 4: Final Answer</h4>
                     <p>${wrongQuestion.solution?.step4 || 'Explanation of why the answer is correct and common pitfalls to avoid.'}</p>
                 </div>
-                
                 <div class="solution-note mt-4">
                     <h4>Pro Tip:</h4>
                     <p>${wrongQuestion.solution?.proTip || 'This is where additional tips and insights would be provided to help you understand the concept better.'}</p>
                 </div>
-                
                 <div class="solution-footer mt-4">
                     <div class="solution-rating">
                         <span>Difficulty:</span>
@@ -1407,26 +1192,21 @@ function showSolution(wrongQuestion) {
             </div>
         </div>
     `;
-    
     // Add to document
     document.body.appendChild(solutionModal);
-    
     // Close button
     solutionModal.querySelector('.close-solution').addEventListener('click', () => {
         document.body.removeChild(solutionModal);
     });
-    
     // Auto-scroll to top
     window.scrollTo(0, 0);
 }
-
 function renderPerformanceHeatmap(result) {
     const ctx = document.getElementById('performance-heatmap').getContext('2d');
     const section = result.section || 'CUSTOM';
     const topics = section === 'CUSTOM' 
         ? Object.keys(result.topicPerformance).slice(0, 20) 
         : SECTIONS[section]?.topics || Object.keys(result.topicPerformance);
-    
     // Calculate performance data
     const data = topics.map(topic => {
         const perf = result.topicPerformance[topic];
@@ -1435,16 +1215,13 @@ function renderPerformanceHeatmap(result) {
         }
         return 0;
     });
-    
     // Create heatmap visualization
     const canvas = document.getElementById('performance-heatmap');
     const width = canvas.width;
     const height = canvas.height;
     const cellWidth = width / Math.min(20, topics.length);
     const cellHeight = height;
-    
     ctx.clearRect(0, 0, width, height);
-    
     // Draw heatmap cells
     data.forEach((percentage, index) => {
         let color;
@@ -1455,10 +1232,8 @@ function renderPerformanceHeatmap(result) {
         } else {
             color = 'rgba(16, 185, 129, 0.7)'; // Green
         }
-        
         ctx.fillStyle = color;
         ctx.fillRect(index * cellWidth, 0, cellWidth - 2, cellHeight);
-        
         // Add labels
         if (index < topics.length) {
             ctx.fillStyle = '#000';
@@ -1468,11 +1243,9 @@ function renderPerformanceHeatmap(result) {
         }
     });
 }
-
 function renderStudyFocusRecommendations(result) {
     const container = document.getElementById('study-focus-container');
     container.innerHTML = '';
-    
     // Get topic performance data
     const topicPerformance = result.topicPerformance || {};
     const topics = Object.keys(topicPerformance)
@@ -1482,12 +1255,10 @@ function renderStudyFocusRecommendations(result) {
             const perfB = topicPerformance[b];
             return (perfA.correct / perfA.total) - (perfB.correct / perfB.total);
         });
-    
     // Generate recommendations for weakest topics
     const recommendations = topics.slice(0, 3).map((topic, index) => {
         const perf = topicPerformance[topic];
         const accuracy = Math.round((perf.correct / perf.total) * 100);
-        
         return `
             <div class="study-focus-item">
                 <strong>${topic}</strong>
@@ -1502,11 +1273,9 @@ function renderStudyFocusRecommendations(result) {
             </div>
         `;
     });
-    
     // Add recommendations
     container.innerHTML = recommendations.join('');
 }
-
 // ======================
 // REVIEW SCREEN
 // ======================
@@ -1516,7 +1285,6 @@ function showReviewScreen(sectionName) {
         alert("Exam questions not found for review.");
         return;
     }
-    
     appState.examQuestions = JSON.parse(questions);
     appState.reviewingSection = sectionName;
     appState.answers[sectionName] = appState.answers[sectionName] || new Array(appState.examQuestions.length).fill(null);
@@ -1524,50 +1292,38 @@ function showReviewScreen(sectionName) {
     const section = sectionName === 'CUSTOM' 
         ? { title: 'Custom Exam' } 
         : SECTIONS[sectionName];
-    
     // Update screen elements
     document.getElementById('review-section-title').textContent = section.title;
     document.getElementById('review-progress').textContent = `Reviewing all ${appState.examQuestions.length} questions`;
-    
     // Set up filters
     const filterSelect = document.getElementById('review-filter');
     filterSelect.value = 'all';
     filterSelect.onchange = applyReviewFilters;
-    
     const difficultySelect = document.getElementById('review-difficulty');
     difficultySelect.value = 'all';
     difficultySelect.onchange = applyReviewFilters;
-    
     const searchInput = document.getElementById('review-search');
     searchInput.value = '';
     searchInput.oninput = applyReviewFilters;
-    
     const container = document.getElementById('review-questions-container');
     container.innerHTML = '';
-    
     // Render questions
     renderReviewQuestions();
-    
     // Set up button actions
     document.getElementById('btn-review-back').onclick = () => showScreen('main-menu');
-    
     // Render answer pattern analysis
     renderAnswerPatternAnalysis(sectionName);
-    
     // Show the screen
     showScreen('review');
 }
-
 function renderReviewQuestions() {
     const sectionName = appState.reviewingSection;
     const answers = appState.answers[sectionName];
     const container = document.getElementById('review-questions-container');
     container.innerHTML = '';
-    
     const filter = document.getElementById('review-filter').value;
     const difficulty = document.getElementById('review-difficulty').value;
     const searchTerm = document.getElementById('review-search').value.toLowerCase();
-    
     appState.examQuestions.forEach((question, index) => {
         const userAnswer = answers[index];
         const isCorrect = userAnswer === question.correct_answer;
@@ -1576,41 +1332,33 @@ function renderReviewQuestions() {
         const notes = appState.questionNotes[sectionName]?.[index] || '';
         const timeSpent = appState.questionTimes[sectionName]?.[index] || 0;
         const difficultyLevel = appState.questionDifficulty[sectionName]?.[index] || 'medium';
-        
         // Apply filters
         if (filter === 'correct' && !isCorrect) return;
         if (filter === 'wrong' && (isCorrect || !isAnswered)) return;
         if (filter === 'skipped' && isAnswered) return;
         if (filter === 'flagged' && !flagged) return;
-        
         if (difficulty !== 'all' && difficultyLevel !== difficulty) return;
-        
         // Apply search
         const searchMatch = question.stem.toLowerCase().includes(searchTerm) ||
                           question.choices.some(c => c.toLowerCase().includes(searchTerm));
         if (searchTerm && !searchMatch) return;
-        
         let resultIndicator = '❓ Skipped';
         let indicatorColor = 'var(--warning-color)';
-        
         if (isAnswered) {
             resultIndicator = isCorrect ? '✅ Correct' : '❌ Wrong';
             indicatorColor = isCorrect ? 'var(--success-color)' : 'var(--danger-color)';
         }
-        
         let choicesHtml = '';
         question.choices.forEach((choice, choiceIndex) => {
             const letter = String.fromCharCode(65 + choiceIndex);
             const isChoiceCorrect = letter === question.correct_answer;
             const isChoiceUser = letter === userAnswer;
             let choiceClass = '';
-            
             if (isChoiceCorrect) {
                 choiceClass = 'bg-green-100 border-green-500';
             } else if (isChoiceUser) {
                 choiceClass = 'bg-red-100 border-red-500';
             }
-            
             choicesHtml += `
                 <button type="button" class="choice-btn ${choiceClass}" disabled>
                     <span class="choice-letter">${letter}.</span>
@@ -1618,7 +1366,6 @@ function renderReviewQuestions() {
                 </button>
             `;
         });
-        
         const reviewCard = document.createElement('div');
         reviewCard.className = 'review-question-card';
         reviewCard.id = `review-question-${index}`;
@@ -1650,7 +1397,6 @@ function renderReviewQuestions() {
         `;
         container.appendChild(reviewCard);
     });
-    
     // Add image zoom functionality
     document.querySelectorAll('img[data-figure]').forEach(img => {
         img.addEventListener('click', () => {
@@ -1659,18 +1405,14 @@ function renderReviewQuestions() {
         });
     });
 }
-
 function applyReviewFilters() {
     renderReviewQuestions();
 }
-
 function renderAnswerPatternAnalysis(sectionName) {
     const container = document.getElementById('answer-patterns');
     container.innerHTML = '';
-    
     const result = appState.results[sectionName];
     if (!result || !result.answerPatterns) return;
-    
     // Common mistakes
     const commonMistakes = result.answerPatterns.commonMistakes;
     if (commonMistakes.length > 0) {
@@ -1686,7 +1428,6 @@ function renderAnswerPatternAnalysis(sectionName) {
                 </div>
             </div>
         `).join('');
-        
         container.innerHTML += `
             <div class="col-span-2">
                 <h3 class="font-bold mb-2">Common Mistakes</h3>
@@ -1694,7 +1435,6 @@ function renderAnswerPatternAnalysis(sectionName) {
             </div>
         `;
     }
-    
     // Streak analysis
     if (result.answerPatterns.streakAnalysis && result.answerPatterns.streakAnalysis.length > 0) {
         const streak = result.answerPatterns.streakAnalysis[0];
@@ -1712,7 +1452,6 @@ function renderAnswerPatternAnalysis(sectionName) {
             </div>
         `;
     }
-    
     // Time analysis
     if (result.answerPatterns.timeAnalysis) {
         container.innerHTML += `
@@ -1732,7 +1471,6 @@ function renderAnswerPatternAnalysis(sectionName) {
         `;
     }
 }
-
 // ======================
 // CONFIRMATION MODAL
 // ======================
@@ -1740,29 +1478,23 @@ function showConfirmModal(title, message, onConfirm) {
     document.getElementById('confirm-title').textContent = title;
     document.getElementById('confirm-message').textContent = message;
     document.getElementById('confirm-modal').classList.remove('hidden');
-    
     const cancelBtn = document.getElementById('btn-confirm-cancel');
     const okBtn = document.getElementById('btn-confirm-ok');
-    
     // Prevent duplicate event listeners
     const newCancelBtn = cancelBtn.cloneNode(true);
     cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
     const newOkBtn = okBtn.cloneNode(true);
     okBtn.parentNode.replaceChild(newOkBtn, okBtn);
-    
     const handleCancel = () => {
         document.getElementById('confirm-modal').classList.add('hidden');
     };
-    
     const handleConfirm = () => {
         onConfirm();
         handleCancel();
     };
-    
     newCancelBtn.addEventListener('click', handleCancel);
     newOkBtn.addEventListener('click', handleConfirm);
 }
-
 // ======================
 // SETTINGS SCREEN
 // ======================
@@ -1774,41 +1506,33 @@ function renderSettingsScreen() {
             btn.classList.add('selected');
         }
     });
-    
     document.querySelectorAll('.font-switcher button').forEach(btn => {
         btn.classList.remove('selected');
         if (btn.id === `font-${appState.settings.fontSize}`) {
             btn.classList.add('selected');
         }
     });
-    
     document.querySelectorAll('.nav-mode-switcher button').forEach(btn => {
         btn.classList.remove('selected');
         if (btn.id === `nav-${appState.settings.navigationMode}`) {
             btn.classList.add('selected');
         }
     });
-    
     // Auto-save status
     const autoSaveStatus = document.getElementById('auto-save-status');
     autoSaveStatus.textContent = appState.settings.autoSave ? '✅' : '❌';
-    
     // Show timer status
     const showTimerStatus = document.getElementById('show-timer-status');
     showTimerStatus.textContent = appState.settings.showTimer ? '✅' : '❌';
-    
     // Show progress status
     const showProgressStatus = document.getElementById('show-progress-status');
     showProgressStatus.textContent = appState.settings.showProgress ? '✅' : '❌';
-    
     // Randomize status
     const randomizeStatus = document.getElementById('randomize-status');
     randomizeStatus.textContent = appState.settings.randomizeQuestions ? '✅' : '❌';
-    
     // Show difficulty status
     const showDifficultyStatus = document.getElementById('show-difficulty-status');
     showDifficultyStatus.textContent = appState.settings.showDifficulty ? '✅' : '❌';
-    
     // Theme switcher
     document.getElementById('theme-light').addEventListener('click', () => {
         appState.settings.theme = 'light';
@@ -1818,7 +1542,6 @@ function renderSettingsScreen() {
         saveState();
         renderSettingsScreen();
     });
-    
     document.getElementById('theme-dark').addEventListener('click', () => {
         appState.settings.theme = 'dark';
         document.documentElement.classList.add('dark');
@@ -1827,78 +1550,66 @@ function renderSettingsScreen() {
         saveState();
         renderSettingsScreen();
     });
-    
     // Font size
     document.getElementById('font-small').addEventListener('click', () => {
         appState.settings.fontSize = 'small';
         saveState();
         renderSettingsScreen();
     });
-    
     document.getElementById('font-medium').addEventListener('click', () => {
         appState.settings.fontSize = 'medium';
         saveState();
         renderSettingsScreen();
     });
-    
     document.getElementById('font-large').addEventListener('click', () => {
         appState.settings.fontSize = 'large';
         saveState();
         renderSettingsScreen();
     });
-    
     // Navigation mode
     document.getElementById('nav-scroll').addEventListener('click', () => {
         appState.settings.navigationMode = 'scroll';
         saveState();
         renderSettingsScreen();
     });
-    
     document.getElementById('nav-step').addEventListener('click', () => {
         appState.settings.navigationMode = 'step';
         saveState();
         renderSettingsScreen();
     });
-    
     // Auto-save toggle
     document.getElementById('btn-auto-save').addEventListener('click', () => {
         appState.settings.autoSave = !appState.settings.autoSave;
         saveState();
         renderSettingsScreen();
     });
-    
     // Show timer toggle
     document.getElementById('btn-show-timer').addEventListener('click', () => {
         appState.settings.showTimer = !appState.settings.showTimer;
         saveState();
         renderSettingsScreen();
     });
-    
     // Show progress toggle
     document.getElementById('btn-show-progress').addEventListener('click', () => {
         appState.settings.showProgress = !appState.settings.showProgress;
         saveState();
         renderSettingsScreen();
     });
-    
     // Randomize questions toggle
     document.getElementById('btn-randomize-questions').addEventListener('click', () => {
         appState.settings.randomizeQuestions = !appState.settings.randomizeQuestions;
         saveState();
         renderSettingsScreen();
     });
-    
     // Show difficulty toggle
     document.getElementById('btn-show-difficulty').addEventListener('click', () => {
         appState.settings.showDifficulty = !appState.settings.showDifficulty;
         saveState();
         renderSettingsScreen();
     });
-    
     // Back button
     document.getElementById('btn-settings-back').addEventListener('click', () => showScreen('main-menu'));
 }
-
 // ======================
 // PDF GENERATION
 // ======================
@@ -1906,7 +1617,6 @@ function generateOfflinePDF() {
     // Create a visual PDF container
     const pdfContainer = document.getElementById('pdf-container');
     pdfContainer.innerHTML = '';
-    
     // Add header
     const header = document.createElement('div');
     header.className = 'printable-header';
@@ -1916,13 +1626,11 @@ function generateOfflinePDF() {
         <p class="text-muted">This document contains all exam questions with figures and explanations for offline study</p>
     `;
     pdfContainer.appendChild(header);
-    
     // Add sections
     Object.values(SECTIONS).forEach((section, sectionIndex) => {
         const sectionContainer = document.createElement('div');
         sectionContainer.className = 'printable-section';
         sectionContainer.innerHTML = `<h3 class="printable-title">Section ${sectionIndex + 1}: ${section.title}</h3>`;
-        
         const questions = getQuestionsForSection(section.name);
         questions.forEach((question, index) => {
             const questionContainer = document.createElement('div');
@@ -1931,7 +1639,6 @@ function generateOfflinePDF() {
                 <h3>Question ${index + 1}</h3>
                 <div class="printable-stem">${question.stem}</div>
             `;
-            
             // Add figure if exists
             if (question.figure) {
                 const figureContainer = document.createElement('div');
@@ -1942,12 +1649,10 @@ function generateOfflinePDF() {
                 `;
                 questionContainer.appendChild(figureContainer);
             }
-            
             // Add choices
             const choicesContainer = document.createElement('div');
             choicesContainer.className = 'printable-choices';
             choicesContainer.innerHTML = '<p>Choices:</p>';
-            
             question.choices.forEach((choice, choiceIndex) => {
                 const letter = String.fromCharCode(65 + choiceIndex);
                 const choiceDiv = document.createElement('div');
@@ -1955,9 +1660,7 @@ function generateOfflinePDF() {
                 choiceDiv.innerHTML = `<span class="choice-letter">${letter}.</span> ${choice.trim()}`;
                 choicesContainer.appendChild(choiceDiv);
             });
-            
             questionContainer.appendChild(choicesContainer);
-            
             // Add explanation if exists
             if (question.explanation) {
                 const explanationContainer = document.createElement('div');
@@ -1968,13 +1671,10 @@ function generateOfflinePDF() {
                 `;
                 questionContainer.appendChild(explanationContainer);
             }
-            
             sectionContainer.appendChild(questionContainer);
         });
-        
         pdfContainer.appendChild(sectionContainer);
     });
-    
     // Add footer
     const footer = document.createElement('div');
     footer.className = 'printable-footer';
@@ -1984,19 +1684,15 @@ function generateOfflinePDF() {
         <p class="text-muted">This document is for personal study purposes only. Do not distribute.</p>
     `;
     pdfContainer.appendChild(footer);
-    
     // Show the PDF container for print preview
     pdfContainer.style.display = 'block';
-    
     // Use the browser's native print dialog
     window.print();
-    
     // Hide the container again after printing
     setTimeout(() => {
         pdfContainer.style.display = 'none';
     }, 1000);
 }
-
 // ======================
 // HTML DECODING UTILITY
 // ======================
@@ -2005,7 +1701,6 @@ function decodeHtmlEntities(text) {
     tempElement.innerHTML = text;
     return tempElement.textContent || tempElement.innerText || '';
 }
-
 // ======================
 // OTHER UTILITIES
 // ======================
@@ -2101,11 +1796,9 @@ function getFallbackQuestions() {
         }
     ];
 }
-
 function getSampleQuestions(sectionName) {
     return getFallbackQuestions().filter(q => q.section === sectionName);
 }
-
 // ======================
 // INITIALIZATION
 // ======================
@@ -2120,16 +1813,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.body.classList.add('light');
         document.body.classList.remove('dark');
     }
-    
     // Apply font size
     document.body.classList.add(`font-${appState.settings.fontSize}`);
-    
     // Apply navigation mode
     document.body.classList.add(`nav-${appState.settings.navigationMode}`);
-    
     // Show loading screen
     showScreen('loading');
-    
     // Load question bank
     try {
         await loadQuestionBank();
@@ -2138,7 +1827,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Failed to initialize app:', error);
         setTimeout(() => showScreen('main-menu'), 1000);
     }
-    
     // Close modal on image click
     const closeImageModal = document.getElementById('close-image-modal');
     if (closeImageModal) {
@@ -2146,10 +1834,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('image-modal').classList.add('hidden');
         };
     }
-    
     // Prevent default form submission
     document.querySelectorAll('form').forEach(form => {
         form.addEventListener('submit', e => e.preventDefault());
     });
 });
-
