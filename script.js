@@ -1106,33 +1106,60 @@ function renderExam() {
 
 function setupExamEventListeners() {
     // Add event listeners for choices
-    document.querySelectorAll('.choice-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const btnEl = e.target.closest('.choice-btn');
-            const questionIndex = parseInt(btnEl.dataset.question);
-            const choice = btnEl.dataset.choice;
-            selectAnswer(questionIndex, choice);
-            
-            // Visual feedback
-            const questionCard = document.getElementById(`question-${questionIndex}`);
-            questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => {
-                choiceBtn.classList.remove('selected');
-            });
-            btnEl.classList.add('selected');
-            
-            // Auto-save
-            if (appState.settings.autoSave) {
-                saveState();
-            }
-            
-            // Auto-advance in step mode
-            if (appState.settings.navigationMode === 'step') {
-                setTimeout(() => {
-                    navigateStep(1);
-                }, 300);
-            }
+document.querySelectorAll('.choice-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const btnEl = e.target.closest('.choice-btn');
+        const questionIndex = parseInt(btnEl.dataset.question);
+        const choice = btnEl.dataset.choice;
+        selectAnswer(questionIndex, choice);
+        
+        // Visual feedback
+        const questionCard = document.getElementById(`question-${questionIndex}`);
+        questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => {
+            choiceBtn.classList.remove('selected');
         });
+        btnEl.classList.add('selected');
+        
+        // Auto-save
+        if (appState.settings.autoSave) {
+            saveState();
+        }
+        
+        // Auto-advance in step mode OR auto-scroll in scroll mode
+        if (appState.settings.navigationMode === 'step') {
+            setTimeout(() => {
+                navigateStep(1);
+            }, 300);
+        } else {
+            // Auto-scroll to next question in scroll mode - Enhanced version
+            setTimeout(() => {
+                const nextQuestionIndex = questionIndex + 1;
+                if (nextQuestionIndex < appState.examQuestions.length) {
+                    const nextQuestionCard = document.getElementById(`question-${nextQuestionIndex}`);
+                    if (nextQuestionCard) {
+                        // More reliable scrolling method
+                        nextQuestionCard.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'start',
+                            inline: 'nearest'
+                        });
+                        
+                        // Additional offset for fixed header
+                        setTimeout(() => {
+                            const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+                            const header = document.querySelector('.exam-header');
+                            const headerHeight = header ? header.offsetHeight : 60;
+                            window.scrollTo({
+                                top: currentScroll - headerHeight - 10,
+                                behavior: 'auto'
+                            });
+                        }, 100);
+                    }
+                }
+            }, 300);
+        }
     });
+});
     
     // Add flagging functionality
     document.querySelectorAll('.toggle-flag').forEach(btn => {
@@ -2124,3 +2151,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         form.addEventListener('submit', e => e.preventDefault());
     });
 });
+
