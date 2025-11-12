@@ -64,14 +64,10 @@
                 
                 <div class="instructions-box">
                     <p class="instructions-title">Please read the following instructions carefully:</p>
-                    <ul id="prc-instructions" class="instructions-list">
-                        <li>Answer each question to the best of your ability.</li>
-                        <li>Use the timer to manage your time. You can pause if allowed.</li>
-                        <li>Flag questions to review later.</li>
-                    </ul>
+                    <ul id="prc-instructions" class="instructions-list"></ul>
                 </div>
 
-                <div id="motivational-quote" class="quote">"Practice doesn't make perfect — practice makes progress."</div>
+                <div id="motivational-quote" class="quote"></div>
 
                 <div class="action-buttons">
                     <button type="button" id="btn-instructions-back" class="btn btn-secondary">
@@ -115,16 +111,19 @@
             </div>
         </main>
 
-        <footer class="exam-footer">
+        <!-- Step Navigation for Step Mode -->
+        <div class="step-navigation-container hidden" id="step-navigation">
             <div class="container">
-                <button type="button" id="btn-jump-to-first" class="btn btn-secondary btn-sm">
-                    ↥ Jump to First Unanswered
-                </button>
-                <button type="button" id="btn-nav-next" class="btn btn-primary btn-sm">
-                    Next Question →
-                </button>
+                <div class="step-navigation">
+                    <button type="button" class="btn btn-secondary" id="btn-prev-step">
+                        ← Previous
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btn-next-step">
+                        Next →
+                    </button>
+                </div>
             </div>
-        </footer>
+        </div>
     </div>
 
     <!-- Results Screen -->
