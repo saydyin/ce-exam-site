@@ -623,7 +623,7 @@ function resetExam() {
     appState.results = {};
     appState.timeLeft = 0;
     appState.currentSection = null;
-    appState.isPaused = false;
+    appState.isPaused = false; // Ensure this is set to false
     appState.firstWrongIndex = null;
     appState.flaggedQuestions = {};
     appState.questionNotes = {};
