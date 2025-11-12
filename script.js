@@ -1907,11 +1907,13 @@ function generateOfflinePDF() {
         allQuestions = allQuestions.concat(sectionQuestions.map(q => ({...q, section: sectionName})));
     });
 
-    // Create answer key
+    // Create answer key - FIXED VERSION
     const answerKey = allQuestions.map((q, index) => {
+        // Ensure we have the correct answer property with fallbacks
+        const correctAnswer = q.correct_answer || q.correctAnswer || 'N/A';
         return {
             number: index + 1,
-            correctAnswer: q.correct_answer,
+            correctAnswer: correctAnswer,
             section: q.section
         };
     });
@@ -1979,7 +1981,7 @@ function generateOfflinePDF() {
             <!-- Page break before answer key -->
             <div style="page-break-before: always;"></div>
 
-            <!-- Answer Key Section -->
+            <!-- Answer Key Section - FIXED VERSION -->
             <div class="printable-section">
                 <div class="printable-header">
                     <h2 class="printable-title">Answer Key</h2>
@@ -1990,7 +1992,7 @@ function generateOfflinePDF() {
                     ${answerKey.map(item => `
                         <div style="padding: 0.5rem; border: 1px solid #e5e7eb; border-radius: 4px; text-align: center;">
                             <div style="font-weight: bold;">Q${item.number}</div>
-                            <div style="font-size: 1.2em; color: #10b981; font-weight: bold;">${item.correct_answer}</div>
+                            <div style="font-size: 1.2em; color: #10b981; font-weight: bold;">${item.correctAnswer}</div>
                             <div style="font-size: 0.8em; color: #666;">${item.section}</div>
                         </div>
                     `).join('')}
@@ -2151,4 +2153,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         form.addEventListener('submit', e => e.preventDefault());
     });
 });
+
 
