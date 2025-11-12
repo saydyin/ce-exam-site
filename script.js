@@ -486,12 +486,24 @@ function loadQuestionsForSection(sectionName) {
     const savedKey = `examQuestions_${sectionName}`;
     const savedQuestions = localStorage.getItem(savedKey);
     let sectionQuestions;
-    if (savedQuestions) {
+    
+    // Check if we're resuming a paused exam or starting fresh
+    const isResuming = appState.isPaused && appState.currentSection === sectionName;
+    
+    if (isResuming && savedQuestions) {
+        // Use saved questions when resuming a paused exam
         sectionQuestions = JSON.parse(savedQuestions);
+        console.log(`Resuming ${sectionName} with ${sectionQuestions.length} saved questions`);
     } else {
+        // Generate new questions for fresh start
+        if (savedQuestions) {
+            localStorage.removeItem(savedKey); // Clear old questions
+        }
         sectionQuestions = getQuestionsForSection(sectionName);
         localStorage.setItem(savedKey, JSON.stringify(sectionQuestions));
+        console.log(`Starting fresh ${sectionName} with ${sectionQuestions.length} new questions`);
     }
+    
     appState.examQuestions = sectionQuestions;
     appState.currentStepIndex = 0;
     
@@ -2153,5 +2165,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         form.addEventListener('submit', e => e.preventDefault());
     });
 });
+
 
 
