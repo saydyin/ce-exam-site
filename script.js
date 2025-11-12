@@ -484,74 +484,48 @@ function showScreen(screenId) {
 // ======================
 function loadQuestionsForSection(sectionName) {
     const savedKey = `examQuestions_${sectionName}`;
-    const savedQuestions = localStorage.getItem(savedKey);
-    let sectionQuestions;
     
-    // Check if we're resuming a paused exam or starting fresh
-    const isResuming = appState.isPaused && appState.currentSection === sectionName;
+    // Always remove saved questions to force fresh randomization
+    localStorage.removeItem(savedKey);
     
-    if (isResuming && savedQuestions) {
-        // Use saved questions when resuming a paused exam
-        sectionQuestions = JSON.parse(savedQuestions);
-        console.log(`Resuming ${sectionName} with ${sectionQuestions.length} saved questions`);
-    } else {
-        // Generate new questions for fresh start
-        if (savedQuestions) {
-            localStorage.removeItem(savedKey); // Clear old questions
-        }
-        sectionQuestions = getQuestionsForSection(sectionName);
-        localStorage.setItem(savedKey, JSON.stringify(sectionQuestions));
-        console.log(`Starting fresh ${sectionName} with ${sectionQuestions.length} new questions`);
-    }
+    // Generate fresh questions with randomization
+    const sectionQuestions = getQuestionsForSection(sectionName);
+    localStorage.setItem(savedKey, JSON.stringify(sectionQuestions));
     
     appState.examQuestions = sectionQuestions;
     appState.currentStepIndex = 0;
     
-    if (!appState.answers[sectionName]) {
-        appState.answers[sectionName] = new Array(sectionQuestions.length).fill(null);
-    }
+    // Initialize all answer arrays fresh
+    appState.answers[sectionName] = new Array(sectionQuestions.length).fill(null);
+    appState.flaggedQuestions[sectionName] = new Array(sectionQuestions.length).fill(false);
+    appState.questionNotes[sectionName] = new Array(sectionQuestions.length).fill('');
+    appState.questionTimes[sectionName] = new Array(sectionQuestions.length).fill(0);
+    appState.questionDifficulty[sectionName] = new Array(sectionQuestions.length).fill('medium');
+    
+    // Initialize performance data fresh
+    appState.performanceData[sectionName] = {
+        difficultyDistribution: {
+            easy: 0,
+            medium: 0,
+            hard: 0
+        },
+        topicPerformance: {},
+        answerPatterns: {
+            commonMistakes: []
+        }
+    };
+    
+    // Set fresh time
     if (!appState.isPaused) {
         appState.timeLeft = SECTIONS[sectionName]?.time || appState.customExam.timeLimit;
-    } else {
-        // Restore previous time if paused
-        const savedTime = localStorage.getItem(`examTime_${sectionName}`);
-        if (savedTime) {
-            appState.timeLeft = parseInt(savedTime);
-        }
     }
-    // Initialize question times
-    if (!appState.questionTimes[sectionName]) {
-        appState.questionTimes[sectionName] = new Array(sectionQuestions.length).fill(0);
-    }
-    // Initialize flagged questions
-    if (!appState.flaggedQuestions[sectionName]) {
-        appState.flaggedQuestions[sectionName] = new Array(sectionQuestions.length).fill(false);
-    }
-    // Initialize notes
-    if (!appState.questionNotes[sectionName]) {
-        appState.questionNotes[sectionName] = new Array(sectionQuestions.length).fill('');
-    }
-    // Initialize difficulty ratings
-    if (!appState.questionDifficulty[sectionName]) {
-        appState.questionDifficulty[sectionName] = new Array(sectionQuestions.length).fill('medium');
-    }
-    // Initialize performance data
-    if (!appState.performanceData[sectionName]) {
-        appState.performanceData[sectionName] = {
-            difficultyDistribution: {
-                easy: 0,
-                medium: 0,
-                hard: 0
-            },
-            topicPerformance: {},
-            answerPatterns: {
-                commonMistakes: []
-            }
-        };
-    }
+    
     if (document.getElementById('exam-timer')) {
         document.getElementById('exam-timer').textContent = formatTime(appState.timeLeft);
     }
+    
+    console.log(`Loaded ${sectionQuestions.length} fresh randomized questions for ${sectionName}`);
+    
     if (!appState.isPaused) {
         startTimer();
     }
@@ -619,17 +593,24 @@ function pauseTimer() {
 function resetExam() {
     if (!confirm('Are you sure you want to reset all exam data? This cannot be undone.')) return;
     clearInterval(appState.timerInterval);
+    
+    // Reset all app state
     appState.answers = {};
     appState.results = {};
     appState.timeLeft = 0;
     appState.currentSection = null;
-    appState.isPaused = false; // Ensure this is set to false
+    appState.isPaused = false;
     appState.firstWrongIndex = null;
     appState.flaggedQuestions = {};
     appState.questionNotes = {};
     appState.questionTimes = {};
     appState.questionDifficulty = {};
     appState.performanceData = {};
+    appState.currentStepIndex = 0;
+    appState.examQuestions = [];
+    appState.reviewingSection = null;
+    
+    // Reset custom exam settings
     appState.customExam = {
         sections: ['AMSTHEC', 'HPGE', 'PSAD'],
         randomize: true,
@@ -637,19 +618,29 @@ function resetExam() {
         questionCount: 100,
         timeLimit: 4 * 60 * 60
     };
+    
+    // Clear ALL localStorage data
     localStorage.removeItem('examAnswers');
     localStorage.removeItem('examResults');
-    localStorage.removeItem('examSettings');
     localStorage.removeItem('examFlagged');
     localStorage.removeItem('examNotes');
     localStorage.removeItem('examTimes');
     localStorage.removeItem('examDifficulty');
     localStorage.removeItem('performanceData');
     localStorage.removeItem('customExam');
+    
+    // Clear saved questions for ALL sections
     Object.keys(SECTIONS).forEach(sectionName => {
         localStorage.removeItem(`examQuestions_${sectionName}`);
         localStorage.removeItem(`examTime_${sectionName}`);
     });
+    
+    // Also clear custom exam questions
+    localStorage.removeItem('examQuestions_CUSTOM');
+    localStorage.removeItem('examTime_CUSTOM');
+    
+    console.log('All exam data reset successfully. Fresh randomization will occur on next start.');
+    
     showScreen('main-menu');
 }
 
@@ -767,7 +758,7 @@ function renderCustomExamBuilder() {
 
             <!-- Summary & Create -->
             <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mb-6">
-                <h3 class="font-bold mb-2">Exam Summary</h3>
+                <h3 class="font-bold mb-2">📋 Exam Summary</h3>
                 <div id="exam-summary" class="text-sm">
                     <!-- Dynamically updated -->
                 </div>
@@ -1118,60 +1109,52 @@ function renderExam() {
 
 function setupExamEventListeners() {
     // Add event listeners for choices
-document.querySelectorAll('.choice-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        const btnEl = e.target.closest('.choice-btn');
-        const questionIndex = parseInt(btnEl.dataset.question);
-        const choice = btnEl.dataset.choice;
-        selectAnswer(questionIndex, choice);
-        
-        // Visual feedback
-        const questionCard = document.getElementById(`question-${questionIndex}`);
-        questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => {
-            choiceBtn.classList.remove('selected');
-        });
-        btnEl.classList.add('selected');
-        
-        // Auto-save
-        if (appState.settings.autoSave) {
-            saveState();
-        }
-        
-        // Auto-advance in step mode OR auto-scroll in scroll mode
-        if (appState.settings.navigationMode === 'step') {
-            setTimeout(() => {
-                navigateStep(1);
-            }, 300);
-        } else {
-            // Auto-scroll to next question in scroll mode - Enhanced version
-            setTimeout(() => {
-                const nextQuestionIndex = questionIndex + 1;
-                if (nextQuestionIndex < appState.examQuestions.length) {
-                    const nextQuestionCard = document.getElementById(`question-${nextQuestionIndex}`);
-                    if (nextQuestionCard) {
-                        // More reliable scrolling method
-                        nextQuestionCard.scrollIntoView({ 
-                            behavior: 'smooth', 
-                            block: 'start',
-                            inline: 'nearest'
-                        });
-                        
-                        // Additional offset for fixed header
-                        setTimeout(() => {
-                            const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+    document.querySelectorAll('.choice-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const btnEl = e.target.closest('.choice-btn');
+            const questionIndex = parseInt(btnEl.dataset.question);
+            const choice = btnEl.dataset.choice;
+            selectAnswer(questionIndex, choice);
+            
+            // Visual feedback
+            const questionCard = document.getElementById(`question-${questionIndex}`);
+            questionCard.querySelectorAll('.choice-btn').forEach(choiceBtn => {
+                choiceBtn.classList.remove('selected');
+            });
+            btnEl.classList.add('selected');
+            
+            // Auto-save
+            if (appState.settings.autoSave) {
+                saveState();
+            }
+            
+            // Auto-advance in step mode OR auto-scroll in scroll mode
+            if (appState.settings.navigationMode === 'step') {
+                setTimeout(() => {
+                    navigateStep(1);
+                }, 300);
+            } else {
+                // Auto-scroll to next question in scroll mode
+                setTimeout(() => {
+                    const nextQuestionIndex = questionIndex + 1;
+                    if (nextQuestionIndex < appState.examQuestions.length) {
+                        const nextQuestionCard = document.getElementById(`question-${nextQuestionIndex}`);
+                        if (nextQuestionCard) {
                             const header = document.querySelector('.exam-header');
                             const headerHeight = header ? header.offsetHeight : 60;
+                            const elementPosition = nextQuestionCard.getBoundingClientRect().top + window.scrollY;
+                            const offsetPosition = elementPosition - headerHeight - 20;
+                            
                             window.scrollTo({
-                                top: currentScroll - headerHeight - 10,
-                                behavior: 'auto'
+                                top: offsetPosition,
+                                behavior: 'smooth'
                             });
-                        }, 100);
+                        }
                     }
-                }
-            }, 300);
-        }
+                }, 300);
+            }
+        });
     });
-});
     
     // Add flagging functionality
     document.querySelectorAll('.toggle-flag').forEach(btn => {
@@ -2165,6 +2148,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         form.addEventListener('submit', e => e.preventDefault());
     });
 });
-
-
-
